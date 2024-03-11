@@ -1,7 +1,8 @@
 {
   "version": 2,
   "builds": [
-    { "src": "/Ada-service/main_service.py", "use": "@vercel/python", "config": { "maxLambdaSize": "15mb", "runtime": "python3.11" }}
+    { "src": "/Ada-service/main_service.py", "use": "@vercel/python", "config": { "maxLambdaSize": "15mb", "runtime": "python3.11" }},
+    { "src": "/Ada-service/logger_config.py", "use": "@vercel/python", "config": { "maxLambdaSize": "15mb", "runtime": "python3.11" }}
   ],
   "routes": [
     { "src": "/(.*)", "dest": "/Ada-service/main_service.py" }
