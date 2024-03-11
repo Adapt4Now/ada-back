@@ -20,7 +20,7 @@ def read_item(message: str):
 
 
 def run():
-    uvicorn.run(app, host="ada-back.vercel.app", port=443, log_level="info")
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
 
 
 if __name__ == "__main__":

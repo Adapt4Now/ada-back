@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "./Ada-service/main_service.py", "use": "@now/python" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "./Ada-service/main_service.py" }
+  ]
+}
