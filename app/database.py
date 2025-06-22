@@ -51,7 +51,7 @@ class DatabaseConfig:
     host: str = os.getenv(ENV_DB_HOST, DEFAULT_DB_CREDENTIALS["host"])
     port: str = os.getenv(ENV_DB_PORT, DEFAULT_DB_CREDENTIALS["port"])
     name: str = os.getenv(ENV_DB_NAME, DEFAULT_DB_CREDENTIALS["name"])
-    pool: PoolConfig = PoolConfig()
+    pool: PoolConfig = field(default_factory=PoolConfig)
 
     @property
     def connection_url(self) -> str:
