@@ -3,7 +3,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select, delete
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task
 from app.models.group import Group
@@ -20,7 +20,7 @@ class TaskNotFoundError(Exception):
 class TaskRepository:
     """Repository for managing task operations in the database."""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     @staticmethod
@@ -36,7 +36,7 @@ class TaskRepository:
         """
         return TaskResponseSchema.model_validate(task)
 
-    def create(self, task_data: TaskCreateSchema) -> TaskResponseSchema:
+    async def create(self, task_data: TaskCreateSchema) -> TaskResponseSchema:
         """
         Create a new task.
 
@@ -53,11 +53,11 @@ class TaskRepository:
             updated_at=datetime.now(UTC)
         )
         self.db.add(db_task)
-        self.db.commit()
-        self.db.refresh(db_task)
+        await self.db.commit()
+        await self.db.refresh(db_task)
         return self._to_task_details(db_task)
 
-    def get_by_id(self, task_id: int) -> Optional[TaskResponseSchema]:
+    async def get_by_id(self, task_id: int) -> Optional[TaskResponseSchema]:
         """
         Get a task by ID.
 
@@ -68,12 +68,13 @@ class TaskRepository:
             Task details if found, None otherwise
         """
         query = select(Task).where(Task.id == task_id)
-        task = self.db.execute(query).scalars().first()
+        result = await self.db.execute(query)
+        task = result.scalars().first()
         if task is None:
             return None
         return self._to_task_details(task)
 
-    def get_all(self) -> List[TaskResponseSchema]:
+    async def get_all(self) -> List[TaskResponseSchema]:
         """
         Get all tasks.
 
@@ -81,10 +82,11 @@ class TaskRepository:
             List of task details
         """
         query = select(Task)
-        tasks = list(self.db.execute(query).scalars().all())
+        result = await self.db.execute(query)
+        tasks = list(result.scalars().all())
         return [self._to_task_details(task) for task in tasks]
 
-    def update(self, task_id: int, task_data: TaskUpdateSchema) -> TaskResponseSchema:
+    async def update(self, task_id: int, task_data: TaskUpdateSchema) -> TaskResponseSchema:
         """
         Update task by ID.
 
@@ -98,9 +100,8 @@ class TaskRepository:
         Raises:
             TaskNotFoundError: If task with given ID doesn't exist
         """
-        task = self.db.execute(
-            select(Task).where(Task.id == task_id)
-        ).scalars().first()
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalars().first()
 
         if not task:
             raise TaskNotFoundError(f"Task with id {task_id} not found")
@@ -114,11 +115,11 @@ class TaskRepository:
         if update_data.get('is_completed'):
             task.completed_at = datetime.now(UTC)
 
-        self.db.commit()
-        self.db.refresh(task)
+        await self.db.commit()
+        await self.db.refresh(task)
         return self._to_task_details(task)
 
-    def delete(self, task_id: int) -> bool:
+    async def delete(self, task_id: int) -> bool:
         """
         Delete task by ID.
 
@@ -129,11 +130,11 @@ class TaskRepository:
             True if task was deleted, False if task wasn't found
         """
         query = delete(Task).where(Task.id == task_id)
-        result = self.db.execute(query)
-        self.db.commit()
+        result = await self.db.execute(query)
+        await self.db.commit()
         return bool(result.rowcount)
 
-    def assign_to_user(self, task_id: int, user_id: int) -> TaskResponseSchema:
+    async def assign_to_user(self, task_id: int, user_id: int) -> TaskResponseSchema:
         """
         Assign task to user.
 
@@ -148,9 +149,9 @@ class TaskRepository:
             TaskNotFoundError: If task with given ID doesn't exist
         """
         update_data = TaskUpdateSchema(**{"assigned_user_id": user_id})
-        return self.update(task_id, update_data)
+        return await self.update(task_id, update_data)
 
-    def assign_to_groups(self, task_id: int, group_ids: List[int]) -> TaskResponseSchema:
+    async def assign_to_groups(self, task_id: int, group_ids: List[int]) -> TaskResponseSchema:
         """
         Assign a task to groups.
 
@@ -164,20 +165,20 @@ class TaskRepository:
         Raises:
             TaskNotFoundError: If a task with a given ID doesn't exist
         """
-        task = self.db.execute(
-            select(Task).where(Task.id == task_id)
-        ).scalars().first()
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalars().first()
 
         if not task:
             raise TaskNotFoundError(f"Task with id {task_id} not found")
 
-        groups = list(self.db.execute(
+        groups_result = await self.db.execute(
             select(Group).where(Group.id.in_(group_ids))
-        ).scalars().all())
+        )
+        groups = list(groups_result.scalars().all())
 
         task.assigned_groups = groups
         task.updated_at = datetime.now(UTC)
 
-        self.db.commit()
-        self.db.refresh(task)
+        await self.db.commit()
+        await self.db.refresh(task)
         return self._to_task_details(task)

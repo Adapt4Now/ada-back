@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean
 from sqlalchemy import true
+from sqlalchemy.orm import relationship
 from app.database import Base
 
 
@@ -11,3 +12,10 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=true(), server_default=true())
+
+    notifications = relationship(
+        "Notification", back_populates="user", cascade="all, delete-orphan"
+    )
+    settings = relationship(
+        "Setting", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
