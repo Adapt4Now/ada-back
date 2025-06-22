@@ -9,10 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
 from app.models.task import Task
+from app.models.group import Group
 from app.schemas.task import (
     TaskCreateSchema,
     TaskResponseSchema,
-    TaskUpdateSchema
+    TaskUpdateSchema,
+    TaskAssignGroupsSchema,
 )
 
 router = APIRouter(
@@ -205,6 +207,80 @@ async def unassign_task_from_user(
         )
 
     task.assigned_user_id = None
+    await db.commit()
+    await db.refresh(task)
+    return TaskResponseSchema.model_validate(task)
+
+
+@router.post(
+    "/{task_id}/assign/groups",
+    response_model=TaskResponseSchema,
+    summary="Assign task to groups",
+)
+async def assign_task_to_groups(
+        task_id: int,
+        assignment: TaskAssignGroupsSchema,
+        db: AsyncSession = Depends(get_database_session)
+) -> TaskResponseSchema:
+    """Assign a task to multiple groups."""
+    query = select(Task).where(Task.id == task_id)
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    groups_result = await db.execute(
+        select(Group).where(Group.id.in_(assignment.group_ids))
+    )
+    groups = groups_result.scalars().all()
+
+    if len(groups) != len(assignment.group_ids):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="One or more groups not found",
+        )
+
+    task.assigned_groups = groups
+    await db.commit()
+    await db.refresh(task)
+    return TaskResponseSchema.model_validate(task)
+
+
+@router.delete(
+    "/{task_id}/unassign/group/{group_id}",
+    response_model=TaskResponseSchema,
+    summary="Unassign task from group",
+)
+async def unassign_task_from_group(
+        task_id: int,
+        group_id: int,
+        db: AsyncSession = Depends(get_database_session)
+) -> TaskResponseSchema:
+    """Remove the task assignment from a specific group."""
+    query = select(Task).where(Task.id == task_id)
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+
+    group_result = await db.execute(select(Group).where(Group.id == group_id))
+    group = group_result.scalar_one_or_none()
+
+    if group is None or group not in task.assigned_groups:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Task is not assigned to this group",
+        )
+
+    task.assigned_groups.remove(group)
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
