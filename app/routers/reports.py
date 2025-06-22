@@ -5,7 +5,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.task import Task, task_group_association
+from app.models.task import Task
+from app.models.associations import task_group_association
 from app.schemas.task import TaskResponseSchema
 
 router = APIRouter()
