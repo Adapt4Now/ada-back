@@ -77,7 +77,7 @@ class Group(Base):
         secondary="task_group_association",
         back_populates="assigned_groups",
         lazy="selectin"
-    )
+        )
 
     def __repr__(self) -> str:
         return (
@@ -86,3 +86,8 @@ class Group(Base):
             f"created_by='{self.created_by}', "
             f"is_active={self.is_active})"
         )
+
+# Import association table after both modules are loaded to avoid circular
+# import issues. This provides ``task_group_association`` in this module's
+# namespace so the relationship above can resolve it by name.
+from .task import task_group_association  # noqa: E402,F401
