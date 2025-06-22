@@ -87,4 +87,3 @@ class Group(Base):
             f"created_by='{self.created_by}', "
             f"is_active={self.is_active})"
         )
-
