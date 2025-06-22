@@ -19,3 +19,10 @@ class User(Base):
     settings = relationship(
         "Setting", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
+
+    # Tasks assigned to the user
+    tasks = relationship(
+        "Task",
+        back_populates="assigned_user",
+        cascade="all, delete-orphan",
+    )
