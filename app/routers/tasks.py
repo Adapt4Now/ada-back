@@ -1,5 +1,7 @@
 
 from typing import List
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -17,6 +19,8 @@ router = APIRouter(
     prefix="/tasks",
     tags=["tasks"]
 )
+
+UTC = ZoneInfo("UTC")
 
 
 @router.get(
@@ -49,7 +53,11 @@ async def create_task(
     """
     Create a new task with the provided data.
     """
-    new_task = Task(**task_data.model_dump())
+    new_task = Task(
+        **task_data.model_dump(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC)
+    )
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
@@ -68,7 +76,7 @@ async def get_task_by_id(
     """
     Get detailed information about a specific task.
     """
-    query = select(Task).where(Task.id.is_(task_id))
+    query = select(Task).where(Task.id == task_id)
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -94,7 +102,7 @@ async def update_task(
     """
     Update task information.
     """
-    query = select(Task).where(Task.id.is_(task_id))
+    query = select(Task).where(Task.id == task_id)
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -124,7 +132,7 @@ async def delete_task(
     """
     Delete a task from the system.
     """
-    query = select(Task).where(Task.id.is_(task_id))
+    query = select(Task).where(Task.id == task_id)
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -151,7 +159,7 @@ async def assign_task_to_user(
     """
     Assign a task to a specific user.
     """
-    query = select(Task).where(Task.id.is_(task_id))
+    query = select(Task).where(Task.id == task_id)
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -180,7 +188,7 @@ async def unassign_task_from_user(
     """
     Remove the task assignment from a specific user.
     """
-    query = select(Task).where(Task.id.is_(task_id))
+    query = select(Task).where(Task.id == task_id)
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
