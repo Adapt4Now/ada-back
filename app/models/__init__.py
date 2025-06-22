@@ -1,6 +1,7 @@
 from .user import User
 from .group import Group
-from .task import Task, task_group_association
+from .task import Task
+from .associations import task_group_association
 from .setting import Setting
 from .notification import Notification
 

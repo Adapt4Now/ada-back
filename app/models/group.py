@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import Integer, String, Text, Boolean, ARRAY, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from .associations import task_group_association
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -71,13 +72,13 @@ class Group(Base):
         nullable=False
     )
 
-    # Using string literals to avoid circular dependencies
+    # Relationship with Task via association table
     tasks: Mapped[List["Task"]] = relationship(
         "Task",
-        secondary="task_group_association",
+        secondary=task_group_association,
         back_populates="assigned_groups",
-        lazy="selectin"
-        )
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return (
@@ -86,8 +87,3 @@ class Group(Base):
             f"created_by='{self.created_by}', "
             f"is_active={self.is_active})"
         )
-
-# Import association table after both modules are loaded to avoid circular
-# import issues. This provides ``task_group_association`` in this module's
-# namespace so the relationship above can resolve it by name.
-from .task import task_group_association  # noqa: E402,F401
