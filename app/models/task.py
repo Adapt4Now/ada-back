@@ -1,18 +1,12 @@
 from datetime import datetime
 from typing import Optional, List
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, Table, Column
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.models.group import Group
-
-task_group_association = Table(
-    'task_groups',
-    Base.metadata,
-    Column('task_id', Integer, ForeignKey('tasks.id', ondelete="CASCADE"), primary_key=True),
-    Column('group_id', Integer, ForeignKey('groups.id', ondelete="CASCADE"), primary_key=True)
-)
+from .associations import task_group_association
 
 
 class Task(Base):
