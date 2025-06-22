@@ -1,6 +1,7 @@
-from typing import Optional
+from typing import List, Optional, Annotated
 from datetime import datetime
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 
 
 class TaskBaseSchema(BaseModel):
@@ -53,3 +54,10 @@ class TaskResponseSchema(TaskBaseSchema):
         gt=0,
         description="ID of the user assigned to this task"
     )
+
+class TaskAssignGroupsSchema(BaseModel):
+    """Schema for assigning task to groups."""
+    group_ids: Annotated[List[int], Field(min_length=1)]
+
+    model_config = ConfigDict(frozen=True)
+
