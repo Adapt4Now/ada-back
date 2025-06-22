@@ -1,13 +1,12 @@
 from logging.config import fileConfig
 from sqlalchemy import create_engine
 from alembic import context
-from app.database import Base
-from app.database import DATABASE_URL
+from app.database import Base, db_config
 
 config = context.config
 fileConfig(config.config_file_name)
 
-DATABASE_URL = DATABASE_URL.replace("asyncpg", "psycopg2")
+DATABASE_URL = db_config.connection_url.replace("asyncpg", "psycopg2")
 
 engine = create_engine(DATABASE_URL)
 
