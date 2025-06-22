@@ -78,7 +78,7 @@ class TaskRepository:
         Get all tasks.
 
         Returns:
-            List of all tasks details
+            List of task details
         """
         query = select(Task)
         tasks = list(self.db.execute(query).scalars().all())
