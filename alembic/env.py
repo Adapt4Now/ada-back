@@ -2,6 +2,8 @@ from logging.config import fileConfig
 from sqlalchemy import create_engine
 from alembic import context
 from app.database import Base, db_config
+# Import models so that Base.metadata is populated for Alembic
+from app import models  # noqa: F401
 
 config = context.config
 fileConfig(config.config_file_name)
