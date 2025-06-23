@@ -63,7 +63,11 @@ class User(Base):
         cascade="all, delete-orphan",
     )
 
-    family = relationship("Family", back_populates="members")
+    family = relationship(
+        "Family",
+        back_populates="members",
+        foreign_keys="User.family_id",
+    )
     families = relationship(
         "Family",
         secondary=user_family_membership,

@@ -29,7 +29,9 @@ class Family(Base):
     )
 
     members: Mapped[List["User"]] = relationship(
-        "User", back_populates="family"
+        "User",
+        back_populates="family",
+        foreign_keys="User.family_id",
     )
     premium_members: Mapped[List["User"]] = relationship(
         "User",
