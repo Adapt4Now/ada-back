@@ -1,15 +1,18 @@
 from .user import User
 from .group import Group
+from .family import Family
 from .task import Task
-from .associations import task_group_association
+from .associations import task_group_association, user_group_membership
 from .setting import Setting
 from .notification import Notification
 
 __all__ = [
     "User",
     "Group",
+    "Family",
     "Task",
     "task_group_association",
+    "user_group_membership",
     "Setting",
     "Notification",
 ]

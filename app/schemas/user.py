@@ -40,6 +40,7 @@ class UserCreateSchema(UserSchemaBase):
     points: int = Field(default=0)
     level: Optional[int] = None
     created_by: Optional[int] = None
+    family_id: Optional[int] = None
 
 
 class UserUpdateSchema(BaseModel):
@@ -66,6 +67,7 @@ class UserUpdateSchema(BaseModel):
     points: Optional[int] = None
     level: Optional[int] = None
     created_by: Optional[int] = None
+    family_id: Optional[int] = None
 
     model_config = ConfigDict(
         str_strip_whitespace=True,
@@ -89,6 +91,7 @@ class UserResponseSchema(UserSchemaBase):
     created_at: datetime
     updated_at: datetime
     created_by: Optional[int] = None
+    family_id: Optional[int] = None
 
     model_config = ConfigDict(
         from_attributes=True,
