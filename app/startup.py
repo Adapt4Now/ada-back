@@ -1,5 +1,6 @@
 from typing import List, Tuple, Type
 from fastapi import FastAPI, APIRouter
+from sqlalchemy import select
 from starlette.middleware.cors import CORSMiddleware
 import logging
 from app.routers import (
@@ -13,6 +14,10 @@ from app.routers import (
     settings,
     admin,
 )
+from app.database import get_database_session
+from app.models.user import User
+from app.schemas.user import UserCreateSchema, UserUpdateSchema
+from app.crud.user import create_user as crud_create_user, update_user as crud_update_user
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -21,6 +26,26 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+
+async def ensure_admin_user() -> None:
+    """Create the default admin user if it does not exist."""
+    async for db in get_database_session():
+        result = await db.execute(select(User).where(User.username == "admin"))
+        admin_user = result.scalar_one_or_none()
+        if admin_user is None:
+            await crud_create_user(
+                db,
+                UserCreateSchema(
+                    username="admin",
+                    email="admin@example.com",
+                    password="password",
+                    is_superuser=True,
+                ),
+            )
+        elif not admin_user.is_superuser:
+            await crud_update_user(db, admin_user.id, UserUpdateSchema(is_superuser=True))
+        break
 
 class ApplicationSetup:
     """Class for initialization and configuration of FastAPI application"""
@@ -65,6 +90,7 @@ class ApplicationSetup:
         """Initialize the application"""
         self.setup_cors()
         self.register_routers()
+        self.app.add_event_handler("startup", ensure_admin_user)
         return self.app
 
 
