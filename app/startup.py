@@ -36,15 +36,15 @@ class ApplicationSetup:
     def __init__(self) -> None:
         self.app = FastAPI()
         self._router_configs: List[Tuple[APIRouter, str]] = [
-            (auth.router, "Auth"),
-            (families.router, "Families"),
-            (groups.router, "Groups"),
-            (tasks.router, "Tasks"),
-            (users.router, "Users"),
-            (reports.router, "Reports"),
-            (notifications.router, "Notifications"),
-            (settings.router, "Settings"),
-            (admin.router, "Admin"),
+            (auth, "Auth"),
+            (families, "Families"),
+            (groups, "Groups"),
+            (tasks, "Tasks"),
+            (users, "Users"),
+            (reports, "Reports"),
+            (notifications, "Notifications"),
+            (settings, "Settings"),
+            (admin, "Admin"),
         ]
 
     def setup_cors(self) -> None:
