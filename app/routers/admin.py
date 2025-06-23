@@ -3,7 +3,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, literal
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,7 +48,7 @@ async def admin_get_user(
     """Return a single user with all related data."""
     result = await db.execute(
         select(User)
-        .where(User.id == user_id)
+        .where(User.id == literal(user_id))
         .options(
             selectinload(User.family),
             selectinload(User.groups),
