@@ -236,7 +236,7 @@ async def assign_task_to_groups(
     groups_result = await db.execute(
         select(Group).where(Group.id.in_(assignment.group_ids))
     )
-    groups = groups_result.scalars().all()
+    groups = list(groups_result.scalars().all())
 
     if len(groups) != len(assignment.group_ids):
         raise HTTPException(
@@ -244,7 +244,7 @@ async def assign_task_to_groups(
             detail="One or more groups not found",
         )
 
-    task.assigned_groups = groups
+    task.assigned_groups = list(groups)
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
