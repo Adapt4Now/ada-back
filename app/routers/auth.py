@@ -41,9 +41,9 @@ async def login(
 
     query = select(User)
     if credentials.username:
-        query = query.where(User.username == credentials.username)
+        query = query.where(User.username == credentials.username)  # type: ignore[arg-type]
     else:
-        query = query.where(User.email == credentials.email)
+        query = query.where(User.email == credentials.email)  # type: ignore[arg-type]
 
     result = await db.execute(query)
     user = result.scalar_one_or_none()

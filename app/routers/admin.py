@@ -48,7 +48,7 @@ async def admin_get_user(
     """Return a single user with all related data."""
     result = await db.execute(
         select(User)
-        .where(User.id == user_id)
+        .where(User.id == user_id)  # type: ignore[arg-type]
         .options(
             selectinload(User.family),
             selectinload(User.groups),

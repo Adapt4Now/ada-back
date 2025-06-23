@@ -17,7 +17,7 @@ async def get_task_summary(db: AsyncSession = Depends(get_database_session)):
     total_result = await db.execute(select(func.count()).select_from(Task))
     total = total_result.scalar_one()
     completed_result = await db.execute(
-        select(func.count()).select_from(Task).where(Task.is_completed)
+        select(func.count()).select_from(Task).where(Task.is_completed.is_(True))
     )
     completed = completed_result.scalar_one()
     return {"total_tasks": total, "completed_tasks": completed}
