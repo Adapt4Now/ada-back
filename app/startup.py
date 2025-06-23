@@ -3,6 +3,7 @@ from fastapi import FastAPI, APIRouter
 from starlette.middleware.cors import CORSMiddleware
 import logging
 from app.routers import (
+    auth,
     tasks,
     users,
     groups,
@@ -34,6 +35,7 @@ class ApplicationSetup:
     def __init__(self) -> None:
         self.app = FastAPI()
         self._router_configs: List[Tuple[APIRouter, str]] = [
+            (auth.router, "Auth"),
             (families.router, "Families"),
             (groups.router, "Groups"),
             (tasks.router, "Tasks"),
