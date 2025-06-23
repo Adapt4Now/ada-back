@@ -6,6 +6,7 @@ from .families import router as families
 from .reports import router as reports
 from .notifications import router as notifications
 from .settings import router as settings
+from .admin import router as admin
 
 __all__ = [
     "auth",
@@ -16,4 +17,5 @@ __all__ = [
     "reports",
     "notifications",
     "settings",
+    "admin",
 ]
