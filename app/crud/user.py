@@ -1,6 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel
 from passlib.context import CryptContext
+from datetime import datetime, UTC
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
@@ -37,6 +38,17 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
             email=user_data.email,
             hashed_password=hashed_password,
             is_active=True,
+            is_superuser=user_data.is_superuser,
+            first_name=user_data.first_name,
+            last_name=user_data.last_name,
+            avatar_url=user_data.avatar_url,
+            locale=user_data.locale,
+            timezone=user_data.timezone,
+            points=user_data.points,
+            level=user_data.level,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            created_by=user_data.created_by,
         )
         session.add(new_user)
         await session.commit()
@@ -70,6 +82,8 @@ async def update_user(
             update_data["hashed_password"] = pwd_context.hash(update_data.pop("password"))
         for field, value in update_data.items():
             setattr(user, field, value)
+
+        user.updated_at = datetime.now(UTC)
 
         await session.commit()
         await session.refresh(user)

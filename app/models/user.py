@@ -1,6 +1,19 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from datetime import datetime
+
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    SmallInteger,
+    String,
+    text,
+)
 from sqlalchemy import true
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+
 from app.database import Base
 
 
@@ -12,6 +25,26 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=true(), server_default=true())
+
+    is_superuser = Column(Boolean, nullable=False, server_default=text('false'))
+    first_name = Column(String(150), nullable=True)
+    last_name = Column(String(150), nullable=True)
+    avatar_url = Column(String, nullable=True)
+    locale = Column(String(20), nullable=False, server_default=text("'en-US'"))
+    timezone = Column(String(50), nullable=False, server_default=text("'UTC'"))
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    points = Column(Integer, nullable=False, server_default=text('0'))
+    level = Column(SmallInteger, nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
 
     notifications = relationship(
         "Notification", back_populates="user", cascade="all, delete-orphan"
@@ -26,3 +59,5 @@ class User(Base):
         back_populates="assigned_user",
         cascade="all, delete-orphan",
     )
+
+    creator = relationship("User", remote_side=[id])
