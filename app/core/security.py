@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-import jwt
+from jwt import PyJWTError, decode, encode
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
@@ -33,7 +33,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 oauth2_scheme = HTTPBearer()
@@ -42,8 +42,8 @@ oauth2_scheme = HTTPBearer()
 def decode_access_token(token: str) -> Dict[str, Any]:
     """Decode a JWT token and return the payload."""
     try:
-        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-    except jwt.PyJWTError as exc:  # noqa: B904 - re-raise with HTTP 401
+        return decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except PyJWTError as exc:  # noqa: B904 - re-raise with HTTP 401
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
