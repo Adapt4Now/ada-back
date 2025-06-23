@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, literal
+from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
@@ -40,12 +40,15 @@ async def login(
         raise HTTPException(status_code=400, detail="Username or email required")
 
     query = select(User)
+    params = {}
     if credentials.username:
-        query = query.where(User.username == literal(credentials.username))
+        query = query.where(User.username == bindparam("u"))
+        params["u"] = credentials.username
     else:
-        query = query.where(User.email == literal(credentials.email))
+        query = query.where(User.email == bindparam("e"))
+        params["e"] = credentials.email
 
-    result = await db.execute(query)
+    result = await db.execute(query, params)
     user = result.scalar_one_or_none()
     if user is None or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Invalid credentials")

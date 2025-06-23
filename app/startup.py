@@ -1,6 +1,6 @@
 from typing import List, Tuple
 from fastapi import FastAPI, APIRouter
-from sqlalchemy import select, literal
+from sqlalchemy import select, bindparam
 from starlette.middleware.cors import CORSMiddleware
 import logging
 from app.routers import (
@@ -32,9 +32,8 @@ logging.basicConfig(
 async def ensure_admin_user() -> None:
     """Create the default admin user if it does not exist."""
     async for db in get_database_session():
-        result = await db.execute(
-            select(User).where(User.username == literal("admin"))
-        )
+        stmt = select(User).where(User.username == bindparam("uname"))
+        result = await db.execute(stmt, {"uname": "admin"})
         admin_user = result.scalar_one_or_none()
         if admin_user is None:
             await crud_create_user(

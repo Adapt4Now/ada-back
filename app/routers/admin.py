@@ -3,7 +3,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, literal
+from sqlalchemy import select, bindparam
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -46,9 +46,9 @@ async def admin_get_user(
     db: AsyncSession = Depends(get_database_session),
 ) -> UserAdminResponseSchema:
     """Return a single user with all related data."""
-    result = await db.execute(
+    stmt = (
         select(User)
-        .where(User.id == literal(user_id))
+        .where(User.id == bindparam("uid"))
         .options(
             selectinload(User.family),
             selectinload(User.groups),
@@ -57,6 +57,7 @@ async def admin_get_user(
             selectinload(User.settings),
         )
     )
+    result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
