@@ -10,3 +10,11 @@ task_group_association = Table(
     Column('task_id', Integer, ForeignKey('tasks.id', ondelete="CASCADE"), primary_key=True),
     Column('group_id', Integer, ForeignKey('groups.id', ondelete="CASCADE"), primary_key=True),
 )
+
+# Association table between users and groups
+user_group_membership = Table(
+    'user_group_membership',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id', ondelete="CASCADE"), primary_key=True),
+    Column('group_id', Integer, ForeignKey('groups.id', ondelete="CASCADE"), primary_key=True),
+)

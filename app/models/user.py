@@ -45,6 +45,7 @@ class User(Base):
         nullable=False,
     )
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    family_id = Column(Integer, ForeignKey("families.id", ondelete="SET NULL"), nullable=True)
 
     notifications = relationship(
         "Notification", back_populates="user", cascade="all, delete-orphan"
@@ -58,6 +59,14 @@ class User(Base):
         "Task",
         back_populates="assigned_user",
         cascade="all, delete-orphan",
+    )
+
+    family = relationship("Family", back_populates="members")
+    groups = relationship(
+        "Group",
+        secondary="user_group_membership",
+        back_populates="users",
+        lazy="selectin",
     )
 
     creator = relationship("User", remote_side=[id])

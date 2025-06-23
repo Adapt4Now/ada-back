@@ -1,9 +1,11 @@
 from typing import List, Optional, cast
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.group import Group
+from app.models.associations import user_group_membership
 from app.schemas.group import GroupCreate, GroupUpdate
 
 
@@ -89,7 +91,11 @@ async def get_groups_by_user(
     active_only: bool = True
 ) -> List[Group]:
     """Get all groups that a user belongs to."""
-    query = select(Group).where(Group.user_ids.contains([user_id]))
+    query = (
+        select(Group)
+        .join(user_group_membership, Group.id == user_group_membership.c.group_id)
+        .where(user_group_membership.c.user_id == user_id)
+    )
     if active_only:
         query = query.where(Group.is_active.is_(True))
     query = query.order_by(Group.id)
@@ -108,10 +114,11 @@ async def add_users_to_group(
     if not db_group:
         return None
 
-    # Add new users without duplicates
-    existing_users = set(db_group.user_ids)
-    new_users = set(user_ids)
-    db_group.user_ids = list(existing_users | new_users)
+    for uid in user_ids:
+        await db.execute(
+            insert(user_group_membership).values(user_id=uid, group_id=group_id)
+            .on_conflict_do_nothing()
+        )
 
     await db.commit()
     await db.refresh(db_group)
@@ -128,12 +135,12 @@ async def remove_users_from_group(
     if not db_group:
         return None
 
-    # Remove specified users
-    users_to_remove = set(user_ids)
-    db_group.user_ids = [
-        uid for uid in db_group.user_ids
-        if uid not in users_to_remove
-    ]
+    await db.execute(
+        delete(user_group_membership).where(
+            user_group_membership.c.group_id == group_id,
+            user_group_membership.c.user_id.in_(user_ids),
+        )
+    )
 
     await db.commit()
     await db.refresh(db_group)
