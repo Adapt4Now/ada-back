@@ -1,8 +1,8 @@
 from datetime import datetime
 from typing import List, Optional
-from sqlalchemy import Integer, String, Text, Boolean, ARRAY, DateTime
+from sqlalchemy import Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .associations import task_group_association
+from .associations import task_group_association, user_group_membership
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -11,6 +11,7 @@ from app.database import Base
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.task import Task
+    from app.models.user import User
 
 
 class Group(Base):
@@ -25,7 +26,6 @@ class Group(Base):
         created_at: Timestamp of group creation
         updated_at: Optional timestamp of last update
         is_active: Flag indicating if a group is active
-        user_ids: List of user IDs belonging to group
         tasks: List of tasks assigned to the group
     """
 
@@ -66,10 +66,19 @@ class Group(Base):
         default=True,
         nullable=False
     )
-    user_ids: Mapped[List[int]] = mapped_column(
-        ARRAY(Integer),
-        default=list,
-        nullable=False
+    family_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("families.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    family = relationship("Family", back_populates="groups")
+    users: Mapped[List["User"]] = relationship(
+        "User",
+        secondary=user_group_membership,
+        back_populates="groups",
+        lazy="selectin",
     )
 
     # Relationship with Task via association table

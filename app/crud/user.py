@@ -49,6 +49,7 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
             created_by=user_data.created_by,
+            family_id=user_data.family_id,
         )
         session.add(new_user)
         await session.commit()

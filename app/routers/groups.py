@@ -120,12 +120,6 @@ async def add_user_to_group(
             detail=f"Group with id {group_id} not found",
         )
 
-    if user_id in group.user_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"User {user_id} is already in group {group_id}",
-        )
-
     updated_group = await crud_add_users_to_group(db, group_id, [user_id])
     assert updated_group is not None  # for type checkers
     return GroupResponse.model_validate(updated_group)
@@ -147,12 +141,6 @@ async def remove_user_from_group(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Group with id {group_id} not found",
-        )
-
-    if user_id not in group.user_ids:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"User {user_id} is not in group {group_id}",
         )
 
     updated_group = await crud_remove_users_from_group(db, group_id, [user_id])

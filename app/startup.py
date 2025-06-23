@@ -6,6 +6,7 @@ from app.routers import (
     tasks,
     users,
     groups,
+    families,
     reports,
     notifications,
     settings,
@@ -33,6 +34,7 @@ class ApplicationSetup:
     def __init__(self) -> None:
         self.app = FastAPI()
         self._router_configs: List[Tuple[APIRouter, str]] = [
+            (families.router, "Families"),
             (groups.router, "Groups"),
             (tasks.router, "Tasks"),
             (users.router, "Users"),

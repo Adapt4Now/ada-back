@@ -45,6 +45,7 @@ class GroupBase(BaseModel):
 
 class GroupCreate(GroupBase):
     """Schema for creating a new group."""
+    family_id: Annotated[int, Field(gt=0)]
     created_by: Annotated[str, Field(
         min_length=1,
         max_length=100,
@@ -127,10 +128,11 @@ class GroupUpdate(BaseModel):
 class GroupResponse(GroupBase):
     """Schema for group data response."""
     id: Annotated[int, Field(
-        gt=0, 
+        gt=0,
         description="Unique group identifier",
         examples=[1, 42]
     )]
+    family_id: Annotated[int, Field(gt=0)]
     created_by: str = Field(
         description="Username of group creator"
     )
