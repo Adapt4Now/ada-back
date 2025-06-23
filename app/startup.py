@@ -32,7 +32,7 @@ logging.basicConfig(
 async def ensure_admin_user() -> None:
     """Create the default admin user if it does not exist."""
     async for db in get_database_session():
-        result = await db.execute(select(User).where(User.username == "admin"))
+        result = await db.execute(select(User).where(User.username == "admin"))  # type: ignore[arg-type]
         admin_user = result.scalar_one_or_none()
         if admin_user is None:
             await crud_create_user(

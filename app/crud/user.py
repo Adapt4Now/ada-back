@@ -56,7 +56,7 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
 
 async def get_user(db: AsyncSession, user_id: int) -> Optional[User]:
     """Retrieve a user by id."""
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == user_id))  # type: ignore[arg-type]
     return result.scalar_one_or_none()
 
 
@@ -66,7 +66,7 @@ async def update_user(
     user_update: UserUpdateSchema,
 ) -> Optional[User]:
     """Update an existing user."""
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == user_id))  # type: ignore[arg-type]
     user = result.scalar_one_or_none()
     if user is None:
         return None
@@ -86,7 +86,7 @@ async def update_user(
 
 async def delete_user(db: AsyncSession, user_id: int) -> bool:
     """Delete a user by id."""
-    result = await db.execute(select(User).where(User.id == user_id))
+    result = await db.execute(select(User).where(User.id == user_id))  # type: ignore[arg-type]
     user = result.scalar_one_or_none()
     if user is None:
         return False
