@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app.models.family import Family
 from app.models.group import Group
-from app.models.associations import user_group_membership
+from app.models.associations import user_group_membership, user_family_membership
 from app.schemas.family import FamilyCreate
 
 
@@ -28,6 +28,12 @@ async def create_family(db: AsyncSession, family: FamilyCreate) -> Family:
     await db.execute(
         user_group_membership.insert().values(
             user_id=family.created_by, group_id=default_group.id
+        )
+    )
+    # add creator to family membership
+    await db.execute(
+        user_family_membership.insert().values(
+            user_id=family.created_by, family_id=db_family.id
         )
     )
     await db.commit()

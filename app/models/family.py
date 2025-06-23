@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+from .associations import user_family_membership
 
 if TYPE_CHECKING:
     from .user import User
@@ -28,7 +29,13 @@ class Family(Base):
     )
 
     members: Mapped[List["User"]] = relationship(
-        "User", back_populates="family", cascade="all, delete-orphan"
+        "User", back_populates="family"
+    )
+    premium_members: Mapped[List["User"]] = relationship(
+        "User",
+        secondary=user_family_membership,
+        back_populates="families",
+        lazy="selectin",
     )
     groups: Mapped[List["Group"]] = relationship(
         "Group", back_populates="family", cascade="all, delete-orphan"

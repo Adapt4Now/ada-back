@@ -37,6 +37,7 @@ class UserCreateSchema(UserSchemaBase):
     locale: str = Field(default="en-US")
     timezone: str = Field(default="UTC")
     is_superuser: bool = Field(default=False)
+    is_premium: bool = Field(default=True)
     points: int = Field(default=0)
     level: Optional[int] = None
     created_by: Optional[int] = None
@@ -63,6 +64,7 @@ class UserUpdateSchema(BaseModel):
     locale: Optional[str] = None
     timezone: Optional[str] = None
     is_superuser: Optional[bool] = None
+    is_premium: Optional[bool] = None
     last_login_at: Optional[datetime] = None
     points: Optional[int] = None
     level: Optional[int] = None
@@ -80,6 +82,7 @@ class UserResponseSchema(UserSchemaBase):
     id: Annotated[int, Field(gt=0)]
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
+    is_premium: bool = Field(default=True)
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     avatar_url: Optional[str] = None

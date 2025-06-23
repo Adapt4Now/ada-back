@@ -15,6 +15,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+from .associations import user_family_membership
 
 
 class User(Base):
@@ -27,6 +28,7 @@ class User(Base):
     is_active = Column(Boolean, default=true(), server_default=true())
 
     is_superuser = Column(Boolean, nullable=False, server_default=text('false'))
+    is_premium = Column(Boolean, nullable=False, server_default=true())
     first_name = Column(String(150), nullable=True)
     last_name = Column(String(150), nullable=True)
     avatar_url = Column(String, nullable=True)
@@ -62,6 +64,12 @@ class User(Base):
     )
 
     family = relationship("Family", back_populates="members")
+    families = relationship(
+        "Family",
+        secondary=user_family_membership,
+        back_populates="premium_members",
+        lazy="selectin",
+    )
     groups = relationship(
         "Group",
         secondary="user_group_membership",
