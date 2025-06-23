@@ -35,6 +35,7 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
         hashed_password=hashed_password,
         is_active=True,
         is_superuser=user_data.is_superuser,
+        is_premium=user_data.is_premium,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         avatar_url=user_data.avatar_url,
