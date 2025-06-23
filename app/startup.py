@@ -40,7 +40,7 @@ async def ensure_admin_user() -> None:
                 db,
                 UserCreateSchema(
                     username="admin",
-                    email=EmailStr("admin@example.com"),
+                    email="admin@example.com",
                     password="password",
                     is_superuser=True,
                 ),
