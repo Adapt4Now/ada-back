@@ -1,4 +1,5 @@
 from typing import Annotated, Optional
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 # Validation constants
@@ -30,6 +31,15 @@ class UserCreateSchema(UserSchemaBase):
         str,
         Field(min_length=PASSWORD_MIN_LENGTH)
     ]
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    locale: str = Field(default="en-US")
+    timezone: str = Field(default="UTC")
+    is_superuser: bool = Field(default=False)
+    points: int = Field(default=0)
+    level: Optional[int] = None
+    created_by: Optional[int] = None
 
 
 class UserUpdateSchema(BaseModel):
@@ -46,6 +56,16 @@ class UserUpdateSchema(BaseModel):
         str,
         Field(min_length=PASSWORD_MIN_LENGTH)
     ]] = None
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    locale: Optional[str] = None
+    timezone: Optional[str] = None
+    is_superuser: Optional[bool] = None
+    last_login_at: Optional[datetime] = None
+    points: Optional[int] = None
+    level: Optional[int] = None
+    created_by: Optional[int] = None
 
     model_config = ConfigDict(
         str_strip_whitespace=True,
@@ -57,6 +77,18 @@ class UserResponseSchema(UserSchemaBase):
     """Schema for user data response."""
     id: Annotated[int, Field(gt=0)]
     is_active: bool = Field(default=True)
+    is_superuser: bool = Field(default=False)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    locale: str = Field(default="en-US")
+    timezone: str = Field(default="UTC")
+    last_login_at: Optional[datetime] = None
+    points: int = Field(default=0)
+    level: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    created_by: Optional[int] = None
 
     model_config = ConfigDict(
         from_attributes=True,
