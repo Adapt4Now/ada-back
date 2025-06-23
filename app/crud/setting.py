@@ -9,7 +9,7 @@ async def get_or_create_settings(db: AsyncSession, user_id: int) -> Setting:
     result = await db.execute(select(Setting).where(Setting.user_id == user_id))
     setting = result.scalar_one_or_none()
     if setting is None:
-        setting = Setting(user_id=user_id)
+        setting = Setting(user_id=user_id, notification_prefs={})
         db.add(setting)
         await db.commit()
         await db.refresh(setting)
