@@ -11,6 +11,7 @@ from app.routers import (
     reports,
     notifications,
     settings,
+    admin,
 )
 
 # Logger setup
@@ -43,6 +44,7 @@ class ApplicationSetup:
             (reports.router, "Reports"),
             (notifications.router, "Notifications"),
             (settings.router, "Settings"),
+            (admin.router, "Admin"),
         ]
 
     def setup_cors(self) -> None:

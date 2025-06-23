@@ -1,6 +1,11 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from .family import FamilyResponse
+from .group import GroupResponse
+from .task import TaskResponseSchema
+from .notification import NotificationResponse
+from .setting import SettingResponse
 
 # Validation constants
 MIN_USERNAME_LENGTH = 3
@@ -97,3 +102,21 @@ class UserResponseSchema(UserSchemaBase):
         from_attributes=True,
         frozen=True
     )
+
+
+class UserAdminResponseSchema(UserResponseSchema):
+    """Extended user schema for admin endpoints including related data."""
+
+    hashed_password: str
+    family: Optional['FamilyResponse'] = None
+    groups: List['GroupResponse'] = []
+    tasks: List['TaskResponseSchema'] = []
+    notifications: List['NotificationResponse'] = []
+    settings: Optional['SettingResponse'] = None
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        frozen=True
+    )
+
+
