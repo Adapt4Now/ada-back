@@ -1,4 +1,4 @@
-from typing import List, Tuple, Type
+from typing import List, Tuple
 from fastapi import FastAPI, APIRouter
 from sqlalchemy import select
 from starlette.middleware.cors import CORSMiddleware
@@ -17,6 +17,7 @@ from app.routers import (
 from app.database import get_database_session
 from app.models.user import User
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
+from pydantic import EmailStr
 from app.crud.user import create_user as crud_create_user, update_user as crud_update_user
 
 # Logger setup
@@ -38,7 +39,7 @@ async def ensure_admin_user() -> None:
                 db,
                 UserCreateSchema(
                     username="admin",
-                    email="admin@example.com",
+                    email=EmailStr("admin@example.com"),
                     password="password",
                     is_superuser=True,
                 ),
