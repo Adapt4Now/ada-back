@@ -4,7 +4,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
@@ -234,7 +234,7 @@ async def assign_task_to_groups(
         )
 
     groups_result = await db.execute(
-        select(Group).where(Group.id.in_(assignment.group_ids))  # type: ignore[arg-type]
+        select(Group).where(Group.id.in_(list(assignment.group_ids)))
     )
     groups = list(groups_result.scalars().all())
 
@@ -271,7 +271,9 @@ async def unassign_task_from_group(
             detail="Task not found",
         )
 
-    group_result = await db.execute(select(Group).where(Group.id == group_id))  # type: ignore[arg-type]
+    group_result = await db.execute(
+        select(Group).where(Group.id == literal(group_id))
+    )
     group = group_result.scalar_one_or_none()
 
     if group is None or group not in task.assigned_groups:

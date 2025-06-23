@@ -1,7 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, UTC
-from sqlalchemy import select
+from sqlalchemy import select, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
@@ -56,7 +56,7 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
 
 async def get_user(db: AsyncSession, user_id: int) -> Optional[User]:
     """Retrieve a user by id."""
-    result = await db.execute(select(User).where(User.id == user_id))  # type: ignore[arg-type]
+    result = await db.execute(select(User).where(User.id == literal(user_id)))
     return result.scalar_one_or_none()
 
 
@@ -66,7 +66,7 @@ async def update_user(
     user_update: UserUpdateSchema,
 ) -> Optional[User]:
     """Update an existing user."""
-    result = await db.execute(select(User).where(User.id == user_id))  # type: ignore[arg-type]
+    result = await db.execute(select(User).where(User.id == literal(user_id)))
     user = result.scalar_one_or_none()
     if user is None:
         return None
@@ -86,7 +86,7 @@ async def update_user(
 
 async def delete_user(db: AsyncSession, user_id: int) -> bool:
     """Delete a user by id."""
-    result = await db.execute(select(User).where(User.id == user_id))  # type: ignore[arg-type]
+    result = await db.execute(select(User).where(User.id == literal(user_id)))
     user = result.scalar_one_or_none()
     if user is None:
         return False

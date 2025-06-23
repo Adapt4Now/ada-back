@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
@@ -41,9 +41,9 @@ async def login(
 
     query = select(User)
     if credentials.username:
-        query = query.where(User.username == credentials.username)  # type: ignore[arg-type]
+        query = query.where(User.username == literal(credentials.username))
     else:
-        query = query.where(User.email == credentials.email)  # type: ignore[arg-type]
+        query = query.where(User.email == literal(credentials.email))
 
     result = await db.execute(query)
     user = result.scalar_one_or_none()
