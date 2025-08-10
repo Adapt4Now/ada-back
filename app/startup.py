@@ -1,4 +1,5 @@
 from typing import List, Tuple
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, APIRouter
 from sqlalchemy import select, bindparam
 from starlette.middleware.cors import CORSMiddleware
@@ -14,7 +15,7 @@ from app.routers import (
     settings,
     admin,
 )
-from app.database import get_database_session
+from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
@@ -29,9 +30,9 @@ logging.basicConfig(
 )
 
 
-async def ensure_admin_user() -> None:
+async def ensure_admin_user(db_manager: DatabaseSessionManager) -> None:
     """Create the default admin user if it does not exist."""
-    async for db in get_database_session():
+    async for db in db_manager.get_session():
         stmt = select(User).where(User.username == bindparam("uname"))
         result = await db.execute(stmt, {"uname": "admin"})
         admin_user = result.scalar_one_or_none()
@@ -49,6 +50,16 @@ async def ensure_admin_user() -> None:
             await crud_update_user(db, admin_user.id, UserUpdateSchema(role=UserRole.ADMIN))
         break
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan management."""
+    db_manager = create_db_manager(DatabaseConfig())
+    app.state.db_manager = db_manager
+    await ensure_admin_user(db_manager)
+    yield
+    await db_manager.close()
+
 class ApplicationSetup:
     """Class for initialization and configuration of FastAPI application"""
 
@@ -61,7 +72,7 @@ class ApplicationSetup:
     }
 
     def __init__(self) -> None:
-        self.app = FastAPI()
+        self.app = FastAPI(lifespan=lifespan)
         self._router_configs: List[Tuple[APIRouter, str]] = [
             (auth, "Auth"),
             (families, "Families"),
@@ -92,7 +103,6 @@ class ApplicationSetup:
         """Initialize the application"""
         self.setup_cors()
         self.register_routers()
-        self.app.add_event_handler("startup", ensure_admin_user)
         return self.app
 
 
