@@ -16,8 +16,8 @@ class GroupRepository(BaseRepository[Group]):
 
     model = Group
 
-    def __init__(self, db: AsyncSession):
-        super().__init__(db)
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def create(self, group: GroupCreate) -> Group:
         return await super().create(group.model_dump())
@@ -26,7 +26,7 @@ class GroupRepository(BaseRepository[Group]):
         query = select(self.model).where(self.model.id == group_id)
         if active_only:
             query = query.where(self.model.is_active.is_(True))
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         return result.scalar_one_or_none()
 
     async def get_list(
@@ -36,7 +36,7 @@ class GroupRepository(BaseRepository[Group]):
         if active_only:
             query = query.where(self.model.is_active.is_(True))
         query = query.order_by(self.model.id).offset(skip).limit(limit)
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         groups = result.scalars().all()
         return cast(List[Group], list(groups))
 
@@ -65,7 +65,7 @@ class GroupRepository(BaseRepository[Group]):
         if active_only:
             query = query.where(Group.is_active.is_(True))
         query = query.order_by(Group.id)
-        result = await self.db.execute(query)
+        result = await self.session.execute(query)
         groups = result.scalars().all()
         return cast(List[Group], list(groups))
 
@@ -76,7 +76,7 @@ class GroupRepository(BaseRepository[Group]):
         if not db_group:
             return None
         for uid, role in user_roles.items():
-            await self.db.execute(
+            await self.session.execute(
                 insert(GroupMembership)
                 .values(user_id=uid, group_id=group_id, role=role)
                 .on_conflict_do_update(
@@ -95,7 +95,7 @@ class GroupRepository(BaseRepository[Group]):
         db_group = await self.get(group_id, active_only=False)
         if not db_group:
             return None
-        await self.db.execute(
+        await self.session.execute(
             delete(GroupMembership).where(
                 GroupMembership.group_id == group_id,
                 GroupMembership.user_id.in_(user_ids),

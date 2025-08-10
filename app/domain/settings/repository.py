@@ -8,15 +8,15 @@ from app.domain.settings.schemas import SettingUpdate
 class SettingRepository:
     """Repository for managing user settings."""
 
-    def __init__(self, db: AsyncSession):
-        self.db = db
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
     async def get_or_create(self, user_id: int) -> Setting:
-        result = await self.db.execute(select(Setting).where(Setting.user_id == user_id))
+        result = await self.session.execute(select(Setting).where(Setting.user_id == user_id))
         setting = result.scalar_one_or_none()
         if setting is None:
             setting = Setting(user_id=user_id, notification_prefs={})
-            self.db.add(setting)
+            self.session.add(setting)
         return setting
 
     async def update(self, user_id: int, data: SettingUpdate) -> Setting:

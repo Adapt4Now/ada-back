@@ -38,22 +38,36 @@ class Container(containers.DeclarativeContainer):
     group_repository = providers.Factory(GroupRepository)
 
     # Service providers
-    user_service = providers.Factory(UserService, repo_factory=user_repository, uow=uow)
-    task_service = providers.Factory(TaskService, repo_factory=task_repository, uow=uow)
-    admin_service = providers.Factory(AdminService, repo_factory=user_repository, uow=uow)
+    user_service = providers.Factory(
+        UserService, repository_factory=user_repository, unit_of_work=uow
+    )
+    task_service = providers.Factory(
+        TaskService, repository_factory=task_repository, unit_of_work=uow
+    )
+    admin_service = providers.Factory(
+        AdminService, repository_factory=user_repository, unit_of_work=uow
+    )
     auth_service = providers.Factory(
         AuthService,
-        user_repo_factory=user_repository,
-        family_repo_factory=family_repository,
-        uow=uow,
+        user_repository_factory=user_repository,
+        family_repository_factory=family_repository,
+        unit_of_work=uow,
     )
-    family_service = providers.Factory(FamilyService, repo_factory=family_repository, uow=uow)
+    family_service = providers.Factory(
+        FamilyService, repository_factory=family_repository, unit_of_work=uow
+    )
     notification_service = providers.Factory(
-        NotificationService, repo_factory=notification_repository, uow=uow
+        NotificationService,
+        repository_factory=notification_repository,
+        unit_of_work=uow,
     )
-    setting_service = providers.Factory(SettingService, repo_factory=setting_repository, uow=uow)
-    group_service = providers.Factory(GroupService, repo_factory=group_repository, uow=uow)
-    report_service = providers.Factory(ReportService, uow=uow)
+    setting_service = providers.Factory(
+        SettingService, repository_factory=setting_repository, unit_of_work=uow
+    )
+    group_service = providers.Factory(
+        GroupService, repository_factory=group_repository, unit_of_work=uow
+    )
+    report_service = providers.Factory(ReportService, unit_of_work=uow)
 
 
 # Global container instance

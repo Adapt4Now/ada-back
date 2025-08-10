@@ -12,16 +12,17 @@ from app.database import UnitOfWork
 class ReportService:
     """Service layer for generating reports."""
 
-    def __init__(self, uow: UnitOfWork):
-        self.uow = uow
+    def __init__(self, unit_of_work: UnitOfWork):
+        self.unit_of_work = unit_of_work
 
     async def get_task_summary(self) -> dict:
-        async with self.uow as uow:
-            total_result = await uow.session.execute(
+        """Return counts of total and completed tasks."""
+        async with self.unit_of_work as unit_of_work:
+            total_result = await unit_of_work.session.execute(
                 select(func.count()).select_from(Task).where(Task.deleted_at.is_(None))
             )
             total = total_result.scalar_one()
-            completed_result = await uow.session.execute(
+            completed_result = await unit_of_work.session.execute(
                 select(func.count())
                 .select_from(Task)
                 .where(Task.is_completed.is_(True), Task.deleted_at.is_(None))
@@ -30,28 +31,31 @@ class ReportService:
         return {"total_tasks": total, "completed_tasks": completed}
 
     async def get_user_task_report(self, user_id: int) -> List[TaskResponseSchema]:
-        async with self.uow as uow:
-            result = await uow.session.execute(
+        """List tasks assigned to a specific user."""
+        async with self.unit_of_work as unit_of_work:
+            result = await unit_of_work.session.execute(
                 select(Task).where(Task.assigned_user_id == user_id, Task.deleted_at.is_(None))
             )
             tasks = result.scalars().all()
         return [TaskResponseSchema.model_validate(task) for task in tasks]
 
     async def get_tasks_assigned_by_user(self, user_id: int) -> List[TaskResponseSchema]:
-        stmt = select(Task).where(
+        """List tasks assigned by a specific user."""
+        statement = select(Task).where(
             Task.assigned_by_user_id == user_id,
             Task.assigned_user_id.isnot(None),
             Task.assigned_user_id != user_id,
             Task.deleted_at.is_(None),
         )
-        async with self.uow as uow:
-            result = await uow.session.execute(stmt)
+        async with self.unit_of_work as unit_of_work:
+            result = await unit_of_work.session.execute(statement)
             tasks = result.scalars().all()
         return [TaskResponseSchema.model_validate(task) for task in tasks]
 
     async def get_group_task_report(self, group_id: int) -> List[TaskResponseSchema]:
-        async with self.uow as uow:
-            result = await uow.session.execute(
+        """List tasks assigned to a group."""
+        async with self.unit_of_work as unit_of_work:
+            result = await unit_of_work.session.execute(
                 select(Task)
                 .join(task_group_association)
                 .where(
@@ -63,7 +67,8 @@ class ReportService:
         return [TaskResponseSchema.model_validate(task) for task in tasks]
 
     async def get_user_groups_tasks(self, user_id: int) -> List[TaskResponseSchema]:
-        stmt = (
+        """List tasks from groups a user belongs to."""
+        statement = (
             select(Task)
             .join(task_group_association)
             .join(
@@ -72,7 +77,7 @@ class ReportService:
             )
             .where(GroupMembership.user_id == user_id)
         )
-        async with self.uow as uow:
-            result = await uow.session.execute(stmt)
+        async with self.unit_of_work as unit_of_work:
+            result = await unit_of_work.session.execute(statement)
             tasks = result.scalars().unique().all()
         return [TaskResponseSchema.model_validate(task) for task in tasks]

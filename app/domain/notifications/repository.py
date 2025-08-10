@@ -13,11 +13,11 @@ class NotificationRepository(BaseRepository[Notification]):
 
     model = Notification
 
-    def __init__(self, db: AsyncSession):
-        super().__init__(db)
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_by_user(self, user_id: int) -> List[Notification]:
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(self.model).where(self.model.user_id == user_id)
         )
         return list(result.scalars().all())
