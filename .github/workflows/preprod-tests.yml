@@ -1,4 +1,4 @@
-name: preprod-tests  # <= важно: совпадает с тем, что вы выбрали в required
+name: preprod-tests
 
 on:
   workflow_call:
