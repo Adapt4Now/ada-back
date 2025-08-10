@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, status
 
 from app.domain.notifications.schemas import NotificationResponse, NotificationCreate
 from app.domain.notifications.service import NotificationService
-from app.dependencies import get_notification_service
+from app.dependencies import container
 
 router = APIRouter()
 
@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
 async def get_notifications(
     user_id: int,
-    service: NotificationService = Depends(get_notification_service),
+    service: NotificationService = Depends(container.notification_service),
 ):
     return await service.get_notifications(user_id)
 
@@ -25,7 +25,7 @@ async def get_notifications(
 async def create_notification(
     user_id: int,
     data: NotificationCreate,
-    service: NotificationService = Depends(get_notification_service),
+    service: NotificationService = Depends(container.notification_service),
 ):
     return await service.create_notification(user_id, data)
 
@@ -36,7 +36,7 @@ async def create_notification(
 )
 async def mark_notification_as_read(
     notification_id: int,
-    service: NotificationService = Depends(get_notification_service),
+    service: NotificationService = Depends(container.notification_service),
 ):
     return await service.mark_as_read(notification_id)
 
@@ -47,6 +47,6 @@ async def mark_notification_as_read(
 )
 async def delete_notification(
     notification_id: int,
-    service: NotificationService = Depends(get_notification_service),
+    service: NotificationService = Depends(container.notification_service),
 ):
     await service.delete_notification(notification_id)

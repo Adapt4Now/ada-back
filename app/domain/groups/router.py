@@ -2,7 +2,7 @@ from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, Path, status
 
-from app.dependencies import get_group_service
+from app.dependencies import container
 
 from .schemas import GroupCreate, GroupUpdate, GroupResponse
 from .service import GroupService
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/groups", tags=["groups"])
     description="Retrieve all groups from the system.",
 )
 async def get_groups(
-    service: GroupService = Depends(get_group_service),
+    service: GroupService = Depends(container.group_service),
 ) -> List[GroupResponse]:
     return await service.get_groups()
 
@@ -31,7 +31,7 @@ async def get_groups(
 )
 async def create_group(
     group_data: GroupCreate,
-    service: GroupService = Depends(get_group_service),
+    service: GroupService = Depends(container.group_service),
 ) -> GroupResponse:
     return await service.create_group(group_data)
 
@@ -44,7 +44,7 @@ async def create_group(
 )
 async def delete_group(
     group_id: Annotated[int, Path(gt=0)],
-    service: GroupService = Depends(get_group_service),
+    service: GroupService = Depends(container.group_service),
 ) -> None:
     await service.delete_group(group_id)
 
@@ -58,7 +58,7 @@ async def delete_group(
 async def update_group(
     group_id: Annotated[int, Path(gt=0)],
     group_data: GroupUpdate,
-    service: GroupService = Depends(get_group_service),
+    service: GroupService = Depends(container.group_service),
 ) -> GroupResponse:
     return await service.update_group(group_id, group_data)
 
@@ -72,7 +72,7 @@ async def update_group(
 async def add_user_to_group(
     group_id: Annotated[int, Path(gt=0)],
     user_id: Annotated[int, Path(gt=0)],
-    service: GroupService = Depends(get_group_service),
+    service: GroupService = Depends(container.group_service),
 ) -> GroupResponse:
     return await service.add_user_to_group(group_id, user_id)
 
@@ -86,6 +86,6 @@ async def add_user_to_group(
 async def remove_user_from_group(
     group_id: Annotated[int, Path(gt=0)],
     user_id: Annotated[int, Path(gt=0)],
-    service: GroupService = Depends(get_group_service),
+    service: GroupService = Depends(container.group_service),
 ) -> GroupResponse:
     return await service.remove_user_from_group(group_id, user_id)

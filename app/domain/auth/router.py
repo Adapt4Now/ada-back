@@ -7,7 +7,7 @@ from app.domain.auth.schemas import (
     PasswordResetRequest,
     Token,
 )
-from app.dependencies import get_auth_service
+from app.dependencies import container
 from app.domain.auth.service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 )
 async def register_user(
     user_data: UserCreateSchema,
-    service: AuthService = Depends(get_auth_service),
+    service: AuthService = Depends(container.auth_service),
 ) -> UserResponseSchema:
     return await service.register_user(user_data)
 
@@ -28,7 +28,7 @@ async def register_user(
 @router.post("/login", response_model=Token)
 async def login(
     credentials: LoginSchema,
-    service: AuthService = Depends(get_auth_service),
+    service: AuthService = Depends(container.auth_service),
 ) -> Token:
     return await service.login(credentials)
 
@@ -36,7 +36,7 @@ async def login(
 @router.post("/request-password-reset")
 async def request_password_reset(
     data: PasswordResetRequest,
-    service: AuthService = Depends(get_auth_service),
+    service: AuthService = Depends(container.auth_service),
 ):
     return await service.request_password_reset(data)
 
@@ -44,6 +44,6 @@ async def request_password_reset(
 @router.post("/reset-password")
 async def apply_password_reset(
     data: PasswordResetConfirm,
-    service: AuthService = Depends(get_auth_service),
+    service: AuthService = Depends(container.auth_service),
 ):
     return await service.apply_password_reset(data)
