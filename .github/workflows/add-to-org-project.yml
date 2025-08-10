@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       item_url:
-        description: 'Full URL of issue/PR for manual run (e.g. https://github.com/Adapt4Now/ada-back/issues/123)'
+        description: 'Full URL of issue/PR for manual run'
         required: false
         type: string
 
@@ -17,10 +17,10 @@ permissions:
 
 concurrency:
   group: org-project-sync-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: false
+  cancel-in-progress: true 
 
 env:
-  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1"
+  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1"  
 
 jobs:
   add-and-sync:
@@ -39,25 +39,19 @@ jobs:
           app-id: ${{ vars.APP_ID }}
           private-key: ${{ secrets.APP_PEM }}
 
-      - name: Add to Project (event mode)
-        if: github.event.issue || github.event.pull_request
-        uses: actions/add-to-project@v1.0.2
-        with:
-          project-url: ${{ env.PROJECT_URL }}
-          github-token: ${{ steps.app.outputs.token }}
-
-      - name: Set fields in Project (Status/Kind/Priority)
+      - name: Add to project & set fields (idempotent)
         uses: actions/github-script@v7
         with:
           github-token: ${{ steps.app.outputs.token }}
           script: |
+            // --- Parse project URL (ORG ONLY)
             const projectUrl = process.env.PROJECT_URL.trim();
             const m = projectUrl.match(/orgs\/([^/]+)\/projects\/(\d+)/);
             if (!m) core.setFailed(`PROJECT_URL must be https://github.com/orgs/<ORG>/projects/<N>. Got: ${projectUrl}`);
             const orgLogin = m[1];
             const projectNumber = parseInt(m[2], 10);
 
-            // Resolve target item (event issue/PR OR manual item_url)
+            // --- Resolve target issue/PR (event or manual item_url)
             const ev = context.payload;
             const itemUrl = (core.getInput('item_url') || '').trim();
 
@@ -70,14 +64,14 @@ jobs:
               return { nodeId: data.node_id, labels: data.labels || [], type: 'pr' };
             }
 
-            let nodeId=null, labels=[], itemType=null, owner=null, repo=null, num=null;
-            if (ev.issue) { nodeId=ev.issue.node_id; labels=ev.issue.labels||[]; itemType='issue'; owner=context.repo.owner; repo=context.repo.repo; }
-            else if (ev.pull_request) { nodeId=ev.pull_request.node_id; labels=ev.pull_request.labels||[]; itemType='pr'; owner=context.repo.owner; repo=context.repo.repo; }
+            let nodeId=null, labels=[], itemType=null;
+            if (ev.issue)         { nodeId=ev.issue.node_id; labels=ev.issue.labels||[]; itemType='issue'; }
+            else if (ev.pull_request){ nodeId=ev.pull_request.node_id; labels=ev.pull_request.labels||[]; itemType='pr'; }
             else if (itemUrl) {
               const mIssue = itemUrl.match(/github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/);
               const mPR    = itemUrl.match(/github\.com\/([^/]+)\/([^/]+)\/pulls?\/(\d+)/);
               if (!mIssue && !mPR) core.setFailed(`Bad item_url: ${itemUrl}`);
-              owner = (mIssue || mPR)[1]; repo = (mIssue || mPR)[2]; num = parseInt((mIssue || mPR)[3], 10);
+              const owner = (mIssue || mPR)[1], repo = (mIssue || mPR)[2], num = parseInt((mIssue || mPR)[3], 10);
               if (mIssue) { const r = await loadIssue(owner, repo, num); nodeId=r.nodeId; labels=r.labels; itemType=r.type; }
               else        { const r = await loadPR(owner, repo, num);    nodeId=r.nodeId; labels=r.labels; itemType=r.type; }
             } else {
@@ -85,7 +79,15 @@ jobs:
               return;
             }
 
-            // Fetch org project + fields
+            // --- Skip non-relevant label changes to reduce runs
+            const changedLabel = ev.label?.name;
+            const rel = l => /^type:/.test(l) || ['P0','P1','P2'].includes(l);
+            if (['labeled','unlabeled'].includes(ev.action) && changedLabel && !rel(changedLabel)) {
+              core.notice(`Irrelevant label change (${changedLabel}), skipping.`);
+              return;
+            }
+
+            // --- Fetch project + fields
             const q = `query($login:String!, $number:Int!){
               organization(login:$login){
                 projectV2(number:$number){
@@ -96,56 +98,47 @@ jobs:
                       ... on ProjectV2SingleSelectField{ id name dataType options{ id name } }
                     }
                   }
-                  items(first:50){
-                    nodes{
-                      id
-                      content { ... on Issue { id } ... on PullRequest { id } }
-                    }
-                  }
                 }
               }
             }`;
-            const res = await github.graphql(q, { login: orgLogin, number: projectNumber });
-            const project = res.organization?.projectV2;
+            const r = await github.graphql(q, { login: orgLogin, number: projectNumber });
+            const project = r.organization?.projectV2;
             if (!project) core.setFailed(`Org Project not found by URL ${projectUrl}`);
             core.info(`Project: ${project.title} (${project.url})`);
-
-            // If manual run, ensure item is added (event mode уже добавил шагом add-to-project)
-            if (!ev.issue && !ev.pull_request) {
-              await github.graphql(
-                `mutation($projectId:ID!,$contentId:ID!){
-                  addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } }
-                }`,
-                { projectId: project.id, contentId: nodeId }
-              );
-              // refresh items
-              const r2 = await github.graphql(q, { login: orgLogin, number: projectNumber });
-              project.items = r2.organization.projectV2.items;
-            }
 
             const fields = project.fields.nodes || [];
             const f = n => fields.find(x => x.name === n);
             const statusField = f('Status');
-            const kindField   = f('Kind');
-            const prioField   = f('Priority');
+            const kindField   = f('Kind');      // your Single select
+            const prioField   = f('Priority');  // your Single select
             if (!statusField) core.setFailed('Field "Status" is missing in Project');
 
-            // find project item id by content id
-            const itemNode = (project.items.nodes || []).find(n => n.content?.id === nodeId);
-            if (!itemNode) core.setFailed('Project item not found after add; increase "items(first:50)" if needed');
-            const projectItemId = itemNode.id;
+            // --- Add (idempotent) and get PROJECT ITEM ID from mutation result
+            const addRes = await github.graphql(
+              `mutation($projectId:ID!,$contentId:ID!){
+                 addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
+                   item { id }
+                 }
+               }`,
+              { projectId: project.id, contentId: nodeId }
+            );
+            const projectItemId = addRes.addProjectV2ItemById.item.id;
+            core.info(`Project item id: ${projectItemId}`);
 
-            const labelNames = labels.map(l => l.name);
+            // --- Map labels -> Kind/Priority
+            const names = labels.map(l => l.name);
             const kindMap = { 'type:feature':'feature','type:bug':'bug','type:chore':'chore','type:docs':'docs','type:refactor':'refactor' };
-            const pickedKindKey = Object.keys(kindMap).find(k => labelNames.includes(k));
+            const pickedKindKey = Object.keys(kindMap).find(k => names.includes(k));
             const kindValue = pickedKindKey ? kindMap[pickedKindKey] : null;
-            const prioValue = ['P0','P1','P2'].find(p => labelNames.includes(p)) || null;
+            const prioValue = ['P0','P1','P2'].find(p => names.includes(p)) || null;
 
+            // --- Decide Status
             const action = context.payload.action;
             const merged = ev.pull_request?.merged === true;
             let statusWanted = 'Inbox';
             if ((itemType==='issue' && action === 'closed') || (itemType==='pr' && action==='closed' && merged)) statusWanted = 'Done';
 
+            // --- Helper: set Single select by itemId (no listing/polling)
             async function setSelect(field, desired){
               if (!field || !desired) return;
               const opts = field.options || [];
@@ -157,9 +150,9 @@ jobs:
               if (!opt) { core.warning(`Option "${desired}" not found in "${field.name}"`); return; }
               await github.graphql(
                 `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:String!){
-                  updateProjectV2ItemFieldValue(
-                    input:{ projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{ singleSelectOptionId:$optionId } }
-                  ){ projectV2Item { id } }
+                  updateProjectV2ItemFieldValue(input:{
+                    projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{ singleSelectOptionId:$optionId }
+                  }) { projectV2Item { id } }
                 }`,
                 { projectId: project.id, itemId: projectItemId, fieldId: field.id, optionId: opt.id }
               );
