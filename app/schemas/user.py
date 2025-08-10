@@ -43,6 +43,8 @@ class UserCreateSchema(UserSchemaBase):
     timezone: str = Field(default="UTC")
     is_superuser: bool = Field(default=False)
     is_premium: bool = Field(default=True)
+    is_email_verified: bool = Field(default=False)
+    email_verified_at: Optional[datetime] = None
     points: int = Field(default=0)
     level: Optional[int] = None
     created_by: Optional[int] = None
@@ -70,6 +72,8 @@ class UserUpdateSchema(BaseModel):
     timezone: Optional[str] = None
     is_superuser: Optional[bool] = None
     is_premium: Optional[bool] = None
+    is_email_verified: Optional[bool] = None
+    email_verified_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     points: Optional[int] = None
     level: Optional[int] = None
@@ -88,6 +92,8 @@ class UserResponseSchema(UserSchemaBase):
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
     is_premium: bool = Field(default=True)
+    is_email_verified: bool = Field(default=False)
+    email_verified_at: Optional[datetime] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     avatar_url: Optional[str] = None

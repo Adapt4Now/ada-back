@@ -1,5 +1,4 @@
 from datetime import datetime, UTC
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +21,6 @@ from app.crud.user import (
 from app.crud.family import create_family
 from app.models.user import User
 from app.core.security import create_access_token, verify_password
-
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
