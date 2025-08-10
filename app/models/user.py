@@ -1,8 +1,11 @@
 
+from enum import Enum
+
 from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Enum as SQLEnum,
     ForeignKey,
     Integer,
     SmallInteger,
@@ -17,6 +20,12 @@ from app.database import Base
 from .associations import user_family_membership
 
 
+class UserRole(str, Enum):
+    USER = "USER"
+    PREMIUM = "PREMIUM"
+    ADMIN = "ADMIN"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -27,11 +36,11 @@ class User(Base):
     reset_token = Column(String, nullable=True, index=True)
     reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=true(), server_default=true())
-
-    is_superuser = Column(Boolean, nullable=False, server_default=text('false'))
-    is_premium = Column(Boolean, nullable=False, server_default=true())
-    is_email_verified = Column(Boolean, nullable=False, server_default=text('false'))
-    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    role = Column(
+        SQLEnum(UserRole, name="userrole"),
+        nullable=False,
+        server_default=UserRole.USER.value,
+    )
     first_name = Column(String(150), nullable=True)
     last_name = Column(String(150), nullable=True)
     avatar_url = Column(String, nullable=True)
