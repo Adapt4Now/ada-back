@@ -7,11 +7,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_database_session
 from app.schemas.user import UserCreateSchema, UserResponseSchema, UserUpdateSchema
 from app.schemas.family import FamilyCreate
-from app.schemas.auth import Token, LoginSchema
-from app.crud.user import create_user, update_user
+from app.schemas.auth import (
+    LoginSchema,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    Token,
+)
+from app.crud.user import (
+    create_reset_token,
+    create_user,
+    reset_password,
+    update_user,
+)
 from app.crud.family import create_family
 from app.models.user import User
-from app.core.security import verify_password, create_access_token
+from app.core.security import create_access_token, verify_password
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -56,3 +66,25 @@ async def login(
     await update_user(db, user.id, UserUpdateSchema(last_login_at=datetime.now(UTC)))
     token = create_access_token({"sub": str(user.id)})
     return Token(access_token=token)
+
+
+@router.post("/request-password-reset")
+async def request_password_reset(
+    data: PasswordResetRequest,
+    db: AsyncSession = Depends(get_database_session),
+):
+    token = await create_reset_token(db, data.email)
+    if token is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"reset_token": token}
+
+
+@router.post("/reset-password")
+async def apply_password_reset(
+    data: PasswordResetConfirm,
+    db: AsyncSession = Depends(get_database_session),
+):
+    success = await reset_password(db, data.token, data.new_password)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    return {"message": "Password reset successful"}

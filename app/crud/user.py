@@ -5,7 +5,11 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import User
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
-from app.core.security import hash_password
+from app.core.security import (
+    generate_reset_token,
+    hash_password,
+    verify_reset_token,
+)
 
 
 class UserCreate(BaseModel):
@@ -94,5 +98,36 @@ async def delete_user(db: AsyncSession, user_id: int) -> bool:
     if user is None:
         return False
     await db.delete(user)
+    await db.commit()
+    return True
+
+
+async def create_reset_token(db: AsyncSession, email: str) -> Optional[str]:
+    stmt = select(User).where(User.email == bindparam("em"))
+    result = await db.execute(stmt, {"em": email})
+    user = result.scalar_one_or_none()
+    if user is None:
+        return None
+
+    token, expires_at = generate_reset_token()
+    user.reset_token = token
+    user.reset_token_expires_at = expires_at
+    await db.commit()
+    return token
+
+
+async def reset_password(
+    db: AsyncSession, token: str, new_password: str
+) -> bool:
+    stmt = select(User).where(User.reset_token == bindparam("tok"))
+    result = await db.execute(stmt, {"tok": token})
+    user = result.scalar_one_or_none()
+    if user is None or not verify_reset_token(user, token):
+        return False
+
+    user.hashed_password = hash_password(new_password)
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    user.updated_at = datetime.now(UTC)
     await db.commit()
     return True
