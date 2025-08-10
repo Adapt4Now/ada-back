@@ -1,7 +1,6 @@
 from typing import List
 import logging
 
-from .repository import TaskRepository
 from .schemas import (
     TaskCreateSchema,
     TaskResponseSchema,
@@ -17,18 +16,19 @@ logger = logging.getLogger(__name__)
 class TaskService:
     """Service layer for task-related operations."""
 
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, repo_factory, uow: UnitOfWork):
+        self.repo_factory = repo_factory
         self.uow = uow
 
     async def get_tasks(self, include_archived: bool = False) -> List[TaskResponseSchema]:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             tasks = await repo.get_all(include_archived)
         return tasks
 
     async def create_task(self, task_data: TaskCreateSchema) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.create(task_data)
         return task
 
@@ -36,7 +36,7 @@ class TaskService:
         self, task_id: int, include_archived: bool = False
     ) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.get_by_id(task_id, include_archived)
         return task
 
@@ -44,20 +44,20 @@ class TaskService:
         self, task_id: int, task_data: TaskUpdateSchema
     ) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.update(task_id, task_data)
         return task
 
     async def delete_task(self, task_id: int) -> None:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             await repo.delete(task_id)
 
     async def assign_task_to_user(
         self, task_id: int, user_id: int, assignment: TaskAssignUserSchema
     ) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.assign_to_user(
                 task_id, user_id, assignment.assigned_by_user_id
             )
@@ -67,7 +67,7 @@ class TaskService:
         self, task_id: int, user_id: int
     ) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.unassign_from_user(task_id, user_id)
         return task
 
@@ -75,7 +75,7 @@ class TaskService:
         self, task_id: int, assignment: TaskAssignGroupsSchema
     ) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.assign_to_groups(task_id, list(assignment.group_ids))
         return task
 
@@ -83,12 +83,12 @@ class TaskService:
         self, task_id: int, group_id: int
     ) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.unassign_from_group(task_id, group_id)
         return task
 
     async def restore_task(self, task_id: int) -> TaskResponseSchema:
         async with self.uow as uow:
-            repo = TaskRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             task = await repo.restore(task_id)
         return task

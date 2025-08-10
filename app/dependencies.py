@@ -38,14 +38,21 @@ class Container(containers.DeclarativeContainer):
     group_repository = providers.Factory(GroupRepository)
 
     # Service providers
-    user_service = providers.Factory(UserService, uow=uow)
-    task_service = providers.Factory(TaskService, uow=uow)
-    admin_service = providers.Factory(AdminService, uow=uow)
-    auth_service = providers.Factory(AuthService, uow=uow)
-    family_service = providers.Factory(FamilyService, uow=uow)
-    notification_service = providers.Factory(NotificationService, uow=uow)
-    setting_service = providers.Factory(SettingService, uow=uow)
-    group_service = providers.Factory(GroupService, uow=uow)
+    user_service = providers.Factory(UserService, repo_factory=user_repository, uow=uow)
+    task_service = providers.Factory(TaskService, repo_factory=task_repository, uow=uow)
+    admin_service = providers.Factory(AdminService, repo_factory=user_repository, uow=uow)
+    auth_service = providers.Factory(
+        AuthService,
+        user_repo_factory=user_repository,
+        family_repo_factory=family_repository,
+        uow=uow,
+    )
+    family_service = providers.Factory(FamilyService, repo_factory=family_repository, uow=uow)
+    notification_service = providers.Factory(
+        NotificationService, repo_factory=notification_repository, uow=uow
+    )
+    setting_service = providers.Factory(SettingService, repo_factory=setting_repository, uow=uow)
+    group_service = providers.Factory(GroupService, repo_factory=group_repository, uow=uow)
     report_service = providers.Factory(ReportService, uow=uow)
 
 

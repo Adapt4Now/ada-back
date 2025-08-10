@@ -3,7 +3,6 @@ import logging
 
 from app.domain.users.models import UserRole
 from app.domain.users.schemas import UserAdminResponseSchema, UserUpdateSchema
-from app.domain.users.repository import UserRepository
 from app.database import UnitOfWork
 
 logger = logging.getLogger(__name__)
@@ -12,23 +11,24 @@ logger = logging.getLogger(__name__)
 class AdminService:
     """Service layer for admin-related user operations."""
 
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, repo_factory, uow: UnitOfWork):
+        self.repo_factory = repo_factory
         self.uow = uow
 
     async def get_users(self) -> List[UserAdminResponseSchema]:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             users = await repo.get_all_with_relations()
         return [UserAdminResponseSchema.model_validate(u) for u in users]
 
     async def get_user(self, user_id: int) -> UserAdminResponseSchema:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             user = await repo.get_with_relations(user_id)
         return UserAdminResponseSchema.model_validate(user)
 
     async def make_user_admin(self, user_id: int) -> UserAdminResponseSchema:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             user = await repo.update(user_id, UserUpdateSchema(role=UserRole.ADMIN))
         return UserAdminResponseSchema.model_validate(user)
