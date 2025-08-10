@@ -4,26 +4,26 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.crud.notification import NotificationRepository
 from app.schemas.notification import NotificationResponse, NotificationCreate
-from app.core.exceptions import NotificationNotFoundError
+from app.services import NotificationService
+from app.crud.notification import NotificationRepository
 
 router = APIRouter()
 
 
-def get_notification_repository(
+def get_notification_service(
     db: AsyncSession = Depends(get_database_session),
-) -> NotificationRepository:
-    return NotificationRepository(db)
+) -> NotificationService:
+    repo = NotificationRepository(db)
+    return NotificationService(repo)
 
 
 @router.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
 async def get_notifications(
     user_id: int,
-    repo: NotificationRepository = Depends(get_notification_repository),
+    service: NotificationService = Depends(get_notification_service),
 ):
-    notifications = await repo.get_by_user(user_id)
-    return [NotificationResponse.model_validate(n) for n in notifications]
+    return await service.get_notifications(user_id)
 
 
 @router.post(
@@ -34,12 +34,9 @@ async def get_notifications(
 async def create_notification(
     user_id: int,
     data: NotificationCreate,
-    repo: NotificationRepository = Depends(get_notification_repository),
+    service: NotificationService = Depends(get_notification_service),
 ):
-    notification = await repo.create(
-        NotificationCreate(user_id=user_id, message=data.message)
-    )
-    return NotificationResponse.model_validate(notification)
+    return await service.create_notification(user_id, data)
 
 
 @router.post(
@@ -48,12 +45,9 @@ async def create_notification(
 )
 async def mark_notification_as_read(
     notification_id: int,
-    repo: NotificationRepository = Depends(get_notification_repository),
+    service: NotificationService = Depends(get_notification_service),
 ):
-    notification = await repo.mark_as_read(notification_id)
-    if notification is None:
-        raise NotificationNotFoundError()
-    return NotificationResponse.model_validate(notification)
+    return await service.mark_as_read(notification_id)
 
 
 @router.delete(
@@ -62,8 +56,6 @@ async def mark_notification_as_read(
 )
 async def delete_notification(
     notification_id: int,
-    repo: NotificationRepository = Depends(get_notification_repository),
+    service: NotificationService = Depends(get_notification_service),
 ):
-    success = await repo.delete(notification_id)
-    if not success:
-        raise NotificationNotFoundError()
+    await service.delete_notification(notification_id)
