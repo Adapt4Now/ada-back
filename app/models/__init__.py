@@ -2,12 +2,8 @@ from .user import User, UserRole
 from .group import Group
 from .family import Family
 from .task import Task
-from .achievement import Achievement, user_achievements
-from .associations import (
-    task_group_association,
-    user_group_membership,
-    user_family_membership,
-)
+from .associations import task_group_association
+from .membership import GroupMembership, FamilyMembership
 from .setting import Setting
 from .notification import Notification
 
@@ -19,9 +15,8 @@ __all__ = [
     "Task",
     "Achievement",
     "task_group_association",
-    "user_group_membership",
-    "user_family_membership",
-    "user_achievements",
+    "GroupMembership",
+    "FamilyMembership",
     "Setting",
     "Notification",
 ]

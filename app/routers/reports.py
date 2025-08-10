@@ -5,8 +5,9 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.task import Task, TaskStatus
-from app.models.associations import task_group_association, user_group_membership
+from app.models.task import Task
+from app.models.associations import task_group_association
+from app.models.membership import GroupMembership
 from app.schemas.task import TaskResponseSchema
 
 router = APIRouter()
@@ -75,13 +76,10 @@ async def get_user_groups_tasks(
         select(Task)
         .join(task_group_association)
         .join(
-            user_group_membership,
-            task_group_association.c.group_id == user_group_membership.c.group_id,
+            GroupMembership,
+            task_group_association.c.group_id == GroupMembership.group_id,
         )
-        .where(
-            user_group_membership.c.user_id == user_id,
-            Task.deleted_at.is_(None),
-        )
+        .where(GroupMembership.user_id == user_id)
     )
     result = await db.execute(stmt)
     tasks = result.scalars().unique().all()

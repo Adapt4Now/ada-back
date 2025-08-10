@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import List, Optional
 from sqlalchemy import Integer, String, Text, Boolean, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from .associations import task_group_association, user_group_membership
+from .associations import task_group_association
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.task import Task
     from app.models.user import User
+    from app.models.membership import GroupMembership as GroupMembershipType
 
 
 class Group(Base):
@@ -74,11 +75,17 @@ class Group(Base):
     )
 
     family = relationship("Family", back_populates="groups")
+    memberships: Mapped[List["GroupMembershipType"]] = relationship(
+        "GroupMembership",
+        back_populates="group",
+        cascade="all, delete-orphan",
+    )
     users: Mapped[List["User"]] = relationship(
         "User",
-        secondary=user_group_membership,
+        secondary="group_memberships",
         back_populates="groups",
         lazy="selectin",
+        viewonly=True,
     )
 
     # Relationship with Task via association table
