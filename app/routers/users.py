@@ -4,7 +4,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from app.crud.user import UserRepository
 from app.database import get_database_session
 from app.schemas.user import (
     UserResponseSchema,
@@ -12,14 +11,17 @@ from app.schemas.user import (
     UserUpdateSchema,
 )
 from app.models.user import UserStatus
+from app.services import UserService
+from app.crud.user import UserRepository
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-def get_user_repository(
+def get_user_service(
     db: AsyncSession = Depends(get_database_session),
-) -> UserRepository:
-    return UserRepository(db)
+) -> UserService:
+    repo = UserRepository(db)
+    return UserService(repo)
 
 
 @router.post(
@@ -30,11 +32,10 @@ def get_user_repository(
 )
 async def create_user(
     user_data: UserCreateSchema,
-    repo: UserRepository = Depends(get_user_repository),
+    service: UserService = Depends(get_user_service),
 ) -> UserResponseSchema:
     """Create a new user."""
-    new_user = await repo.create(user_data)
-    return UserResponseSchema.model_validate(new_user)
+    return await service.create_user(user_data)
 
 
 @router.get(
@@ -43,11 +44,10 @@ async def create_user(
     summary="Get all users",
 )
 async def get_users_list(
-    repo: UserRepository = Depends(get_user_repository),
+    service: UserService = Depends(get_user_service),
 ) -> List[UserResponseSchema]:
     """Retrieve all users from the system."""
-    users = await repo.get_all()
-    return [UserResponseSchema.model_validate(user) for user in users]
+    return await service.get_users()
 
 
 @router.get(
@@ -57,11 +57,10 @@ async def get_users_list(
 )
 async def get_user_details(
     user_id: int,
-    repo: UserRepository = Depends(get_user_repository),
+    service: UserService = Depends(get_user_service),
 ) -> UserResponseSchema:
     """Get detailed information about a specific user."""
-    user = await repo.get_by_id(user_id)
-    return UserResponseSchema.model_validate(user)
+    return await service.get_user(user_id)
 
 
 @router.delete(
@@ -71,10 +70,10 @@ async def get_user_details(
 )
 async def delete_user(
     user_id: int,
-    repo: UserRepository = Depends(get_user_repository),
+    service: UserService = Depends(get_user_service),
 ) -> None:
     """Delete a user from the system."""
-    await repo.delete(user_id)
+    await service.delete_user(user_id)
 
 
 @router.put(
@@ -85,11 +84,10 @@ async def delete_user(
 async def update_user(
     user_id: int,
     user_data: UserUpdateSchema,
-    repo: UserRepository = Depends(get_user_repository),
+    service: UserService = Depends(get_user_service),
 ) -> UserResponseSchema:
     """Update user information."""
-    user = await repo.update(user_id, user_data)
-    return UserResponseSchema.model_validate(user)
+    return await service.update_user(user_id, user_data)
 
 
 class UserStatusUpdate(BaseModel):
@@ -104,8 +102,7 @@ class UserStatusUpdate(BaseModel):
 async def update_user_status_endpoint(
     user_id: int,
     status_data: UserStatusUpdate,
-    repo: UserRepository = Depends(get_user_repository),
+    service: UserService = Depends(get_user_service),
 ) -> UserResponseSchema:
     """Update the status of a user."""
-    user = await repo.update_status(user_id, status_data.status)
-    return UserResponseSchema.model_validate(user)
+    return await service.update_status(user_id, status_data.status)

@@ -5,41 +5,37 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
 from app.schemas.family import FamilyCreate, FamilyResponse
+from app.services import FamilyService
 from app.crud.family import FamilyRepository
-from app.core.exceptions import FamilyNotFoundError
 
 router = APIRouter(prefix="/families", tags=["families"])
 
 
-def get_family_repository(
+def get_family_service(
     db: AsyncSession = Depends(get_database_session),
-) -> FamilyRepository:
-    return FamilyRepository(db)
+) -> FamilyService:
+    repo = FamilyRepository(db)
+    return FamilyService(repo)
 
 
 @router.post("/", response_model=FamilyResponse, status_code=status.HTTP_201_CREATED)
 async def create_family(
     family_data: FamilyCreate,
-    repo: FamilyRepository = Depends(get_family_repository),
+    service: FamilyService = Depends(get_family_service),
 ) -> FamilyResponse:
-    new_family = await repo.create(family_data)
-    return FamilyResponse.model_validate(new_family)
+    return await service.create_family(family_data)
 
 
 @router.get("/", response_model=List[FamilyResponse])
 async def list_families(
-    repo: FamilyRepository = Depends(get_family_repository),
+    service: FamilyService = Depends(get_family_service),
 ) -> List[FamilyResponse]:
-    families = await repo.get_all()
-    return [FamilyResponse.model_validate(f) for f in families]
+    return await service.list_families()
 
 
 @router.get("/{family_id}", response_model=FamilyResponse)
 async def get_family(
     family_id: int,
-    repo: FamilyRepository = Depends(get_family_repository),
+    service: FamilyService = Depends(get_family_service),
 ) -> FamilyResponse:
-    family = await repo.get(family_id)
-    if family is None:
-        raise FamilyNotFoundError()
-    return FamilyResponse.model_validate(family)
+    return await service.get_family(family_id)
