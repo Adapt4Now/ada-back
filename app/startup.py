@@ -98,7 +98,10 @@ class ApplicationSetup:
         modules: List[ModuleType] = []
         try:
             for router, tag, module in discover_router_configs():
-                self.app.include_router(router, prefix=self.API_PREFIX, tags=[tag])
+                if tag.lower() == "health":
+                    self.app.include_router(router, tags=[tag])
+                else:
+                    self.app.include_router(router, prefix=self.API_PREFIX, tags=[tag])
                 logger.info(f"Router {tag} registered")
                 modules.append(module)
         except Exception as e:
