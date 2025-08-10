@@ -10,7 +10,7 @@ from app.models.group import Group
 from app.models.user import User
 from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
 from app.crud.achievement import AchievementRepository
-from app.core.exceptions import TaskNotFoundError
+from app.core.exceptions import AppError, TaskNotFoundError, GroupNotFoundError
 
 UTC = ZoneInfo("UTC")
 
@@ -58,11 +58,12 @@ class TaskRepository:
         await self.db.refresh(db_task)
         return self._to_task_details(db_task)
 
-    async def get_by_id(self, task_id: int) -> TaskResponseSchema:
+    async def get_by_id(self, task_id: int, include_archived: bool = False) -> TaskResponseSchema:
         """Get a task by ID.
 
         Args:
             task_id: Task identifier
+            include_archived: Include archived tasks if True
 
         Returns:
             Task details
@@ -70,23 +71,28 @@ class TaskRepository:
         Raises:
             TaskNotFoundError: If the task does not exist
         """
-        query = select(Task).where(
-            Task.id == task_id, Task.deleted_at.is_(None)
-        )
+        query = select(Task).where(Task.id == task_id)
+        if not include_archived:
+            query = query.where(Task.deleted_at.is_(None))
         result = await self.db.execute(query)
         task = result.scalars().first()
         if task is None:
             raise TaskNotFoundError
         return self._to_task_details(task)
 
-    async def get_all(self) -> List[TaskResponseSchema]:
+    async def get_all(self, include_archived: bool = False) -> List[TaskResponseSchema]:
         """
         Get all tasks.
+
+        Args:
+            include_archived: Include archived tasks if True
 
         Returns:
             List of task details
         """
-        query = select(Task).where(Task.deleted_at.is_(None))
+        query = select(Task)
+        if not include_archived:
+            query = query.where(Task.deleted_at.is_(None))
         result = await self.db.execute(query)
         tasks = list(result.scalars().all())
         return [self._to_task_details(task) for task in tasks]
@@ -167,13 +173,16 @@ class TaskRepository:
         await self.db.refresh(task)
         return self._to_task_details(task)
 
-    async def assign_to_user(self, task_id: int, user_id: int) -> TaskResponseSchema:
+    async def assign_to_user(
+        self, task_id: int, user_id: int, assigned_by_user_id: int
+    ) -> TaskResponseSchema:
         """
         Assign task to user.
 
         Args:
             task_id: Task identifier
             user_id: User identifier
+            assigned_by_user_id: ID of the user who assigns the task
 
         Returns:
             Updated task details
@@ -181,23 +190,13 @@ class TaskRepository:
         Raises:
             TaskNotFoundError: If task with given ID doesn't exist
         """
-        update_data = TaskUpdateSchema(**{"assigned_user_id": user_id})
+        update_data = TaskUpdateSchema(
+            assigned_user_id=user_id, assigned_by_user_id=assigned_by_user_id
+        )
         return await self.update(task_id, update_data)
 
     async def assign_to_groups(self, task_id: int, group_ids: List[int]) -> TaskResponseSchema:
-        """
-        Assign a task to groups.
-
-        Args:
-            task_id: Task identifier
-            group_ids: List of group identifiers
-
-        Returns:
-            Updated task details
-
-        Raises:
-            TaskNotFoundError: If a task with a given ID doesn't exist
-        """
+        """Assign a task to groups."""
         result = await self.db.execute(
             select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
         )
@@ -211,9 +210,58 @@ class TaskRepository:
         )
         groups = list(groups_result.scalars().all())
 
+        if len(groups) != len(group_ids):
+            raise GroupNotFoundError("One or more groups not found")
+
         task.assigned_groups = groups
         task.updated_at = datetime.now(UTC)
 
+        await self.db.commit()
+        await self.db.refresh(task)
+        return self._to_task_details(task)
+
+    async def unassign_from_user(
+        self, task_id: int, user_id: int
+    ) -> TaskResponseSchema:
+        """Remove task assignment from a user."""
+        result = await self.db.execute(
+            select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
+        )
+        task = result.scalars().first()
+
+        if not task:
+            raise TaskNotFoundError
+
+        if task.assigned_user_id != user_id:
+            raise AppError("Task is not assigned to this user")
+
+        task.assigned_user_id = None
+        task.assigned_by_user_id = None
+        task.updated_at = datetime.now(UTC)
+        await self.db.commit()
+        await self.db.refresh(task)
+        return self._to_task_details(task)
+
+    async def unassign_from_group(
+        self, task_id: int, group_id: int
+    ) -> TaskResponseSchema:
+        """Remove task assignment from a group."""
+        result = await self.db.execute(
+            select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
+        )
+        task = result.scalars().first()
+
+        if not task:
+            raise TaskNotFoundError
+
+        group_result = await self.db.execute(select(Group).where(Group.id == group_id))
+        group = group_result.scalar_one_or_none()
+
+        if group is None or group not in task.assigned_groups:
+            raise AppError("Task is not assigned to this group")
+
+        task.assigned_groups.remove(group)
+        task.updated_at = datetime.now(UTC)
         await self.db.commit()
         await self.db.refresh(task)
         return self._to_task_details(task)
