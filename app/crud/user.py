@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from pydantic import BaseModel
 from datetime import datetime, UTC
 from sqlalchemy import select, bindparam
@@ -10,6 +10,7 @@ from app.core.security import (
     hash_password,
     verify_reset_token,
 )
+from app.core.exceptions import UserNotFoundError
 
 
 class UserCreate(BaseModel):
@@ -59,24 +60,27 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
     return new_user
 
 
-async def get_user(db: AsyncSession, user_id: int) -> Optional[User]:
+async def get_user(db: AsyncSession, user_id: int) -> User:
     """Retrieve a user by id."""
     stmt = select(User).where(User.id == bindparam("uid"))
     result = await db.execute(stmt, {"uid": user_id})
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise UserNotFoundError(f"User with id {user_id} not found")
+    return user
 
 
 async def update_user(
     db: AsyncSession,
     user_id: int,
     user_update: UserUpdateSchema,
-) -> Optional[User]:
+) -> User:
     """Update an existing user."""
     stmt = select(User).where(User.id == bindparam("uid"))
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        return None
+        raise UserNotFoundError(f"User with id {user_id} not found")
 
     update_data = user_update.model_dump(exclude_unset=True)
     if "password" in update_data:
@@ -91,27 +95,26 @@ async def update_user(
     return user
 
 
-async def delete_user(db: AsyncSession, user_id: int) -> bool:
+async def delete_user(db: AsyncSession, user_id: int) -> None:
     """Delete a user by id."""
     stmt = select(User).where(User.id == bindparam("uid"))
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        return False
+        raise UserNotFoundError(f"User with id {user_id} not found")
     await db.delete(user)
     await db.commit()
-    return True
 
 
 async def update_user_status(
     db: AsyncSession, user_id: int, status: UserStatus
-) -> Optional[User]:
+) -> User:
     """Update only the status of a user."""
     stmt = select(User).where(User.id == bindparam("uid"))
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        return None
+        raise UserNotFoundError(f"User with id {user_id} not found")
     user.status = status
     user.updated_at = datetime.now(UTC)
     await db.commit()

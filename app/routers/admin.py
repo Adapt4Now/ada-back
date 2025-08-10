@@ -13,6 +13,7 @@ from app.schemas.user import UserAdminResponseSchema, UserUpdateSchema
 from app.core.security import get_current_admin
 from app.models.user import UserRole
 from app.crud.user import update_user as crud_update_user
+from app.core.exceptions import UserNotFoundError
 
 
 router = APIRouter(
@@ -71,7 +72,8 @@ async def make_user_admin(
     db: AsyncSession = Depends(get_database_session),
 ) -> UserAdminResponseSchema:
     """Grant administrative rights to the specified user."""
-    user = await crud_update_user(db, user_id, UserUpdateSchema(role=UserRole.ADMIN))
-    if user is None:
+    try:
+        user = await crud_update_user(db, user_id, UserUpdateSchema(role=UserRole.ADMIN))
+    except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserAdminResponseSchema.model_validate(user)

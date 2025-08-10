@@ -19,6 +19,7 @@ from app.schemas.user import (
     UserUpdateSchema
 )
 from app.models.user import UserStatus
+from app.core.exceptions import UserNotFoundError
 
 router = APIRouter(
     prefix="/users",
@@ -76,8 +77,9 @@ async def get_user_details(
     Parameters:
     - **user_id**: unique identifier of the user
     """
-    user = await crud_get_user(db, user_id)
-    if user is None:
+    try:
+        user = await crud_get_user(db, user_id)
+    except UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -100,8 +102,9 @@ async def delete_user(
     Parameters:
     - **user_id**: unique identifier of the user to delete
     """
-    success = await crud_delete_user(db, user_id)
-    if not success:
+    try:
+        await crud_delete_user(db, user_id)
+    except UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -125,8 +128,9 @@ async def update_user(
     - **user_id**: unique identifier of the user to update
     - **user_data**: updated user information
     """
-    user = await crud_update_user(db, user_id, user_data)
-    if user is None:
+    try:
+        user = await crud_update_user(db, user_id, user_data)
+    except UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -149,8 +153,9 @@ async def update_user_status_endpoint(
     db: AsyncSession = Depends(get_database_session),
 ) -> UserResponseSchema:
     """Update the status of a user."""
-    user = await crud_update_user_status(db, user_id, status_data.status)
-    if user is None:
+    try:
+        user = await crud_update_user_status(db, user_id, status_data.status)
+    except UserNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
