@@ -26,40 +26,44 @@ class AuthService:
 
     def __init__(
         self,
-        user_repo_factory,
-        family_repo_factory,
-        uow: UnitOfWork,
+        user_repository_factory,
+        family_repository_factory,
+        unit_of_work: UnitOfWork,
     ):
-        self.user_repo_factory = user_repo_factory
-        self.family_repo_factory = family_repo_factory
-        self.uow = uow
+        self.user_repository_factory = user_repository_factory
+        self.family_repository_factory = family_repository_factory
+        self.unit_of_work = unit_of_work
 
     async def register_user(self, user_data: UserCreateSchema) -> UserResponseSchema:
-        async with self.uow as uow:
-            user_repo = self.user_repo_factory(uow.session)
-            family_repo = self.family_repo_factory(uow.session)
-            new_user = await user_repo.create(user_data)
-            family = await family_repo.create(
+        """Register a new user and create a family for them."""
+        logger.info("Registering user")
+        async with self.unit_of_work as unit_of_work:
+            user_repository = self.user_repository_factory(unit_of_work.session)
+            family_repository = self.family_repository_factory(unit_of_work.session)
+            new_user = await user_repository.create(user_data)
+            family = await family_repository.create(
                 FamilyCreate(name=f"{new_user.username}'s family", created_by=new_user.id)
             )
-            user = await user_repo.update(
+            user = await user_repository.update(
                 new_user.id, UserUpdateSchema(family_id=family.id)
             )
         logger.info("Registered user %s", new_user.id)
         return UserResponseSchema.model_validate(user)
 
     async def login(self, credentials: LoginSchema) -> Token:
+        """Authenticate a user and return an access token."""
         if not credentials.username and not credentials.email:
             raise AppError("Username or email required")
 
-        async with self.uow as uow:
-            user_repo = self.user_repo_factory(uow.session)
-            user = await user_repo.get_by_username_or_email(
+        logger.info("User login attempt")
+        async with self.unit_of_work as unit_of_work:
+            user_repository = self.user_repository_factory(unit_of_work.session)
+            user = await user_repository.get_by_username_or_email(
                 credentials.username, credentials.email
             )
             if user is None or not verify_password(credentials.password, user.hashed_password):
                 raise AppError("Invalid credentials")
-            await user_repo.update(
+            await user_repository.update(
                 user.id, UserUpdateSchema(last_login_at=datetime.now(UTC))
             )
         token = create_access_token({"sub": str(user.id)})
@@ -67,18 +71,22 @@ class AuthService:
         return Token(access_token=token)
 
     async def request_password_reset(self, data: PasswordResetRequest) -> dict:
-        async with self.uow as uow:
-            user_repo = self.user_repo_factory(uow.session)
-            token = await user_repo.create_reset_token(data.email)
+        """Generate a password reset token for a user."""
+        logger.info("Password reset requested for %s", data.email)
+        async with self.unit_of_work as unit_of_work:
+            user_repository = self.user_repository_factory(unit_of_work.session)
+            token = await user_repository.create_reset_token(data.email)
             if token is None:
                 raise UserNotFoundError()
-        logger.info("Password reset requested for %s", data.email)
+        logger.info("Password reset token created for %s", data.email)
         return {"reset_token": token}
 
     async def apply_password_reset(self, data: PasswordResetConfirm) -> dict:
-        async with self.uow as uow:
-            user_repo = self.user_repo_factory(uow.session)
-            success = await user_repo.reset_password(data.token, data.new_password)
+        """Apply a password reset using a token."""
+        logger.info("Applying password reset")
+        async with self.unit_of_work as unit_of_work:
+            user_repository = self.user_repository_factory(unit_of_work.session)
+            success = await user_repository.reset_password(data.token, data.new_password)
             if not success:
                 raise AppError("Invalid or expired token")
         logger.info("Password reset applied")

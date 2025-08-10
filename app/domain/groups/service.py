@@ -1,60 +1,79 @@
 from typing import List
+import logging
 
 from app.core.exceptions import GroupNotFoundError
 from .schemas import GroupCreate, GroupUpdate, GroupResponse
 from app.database import UnitOfWork
 
+logger = logging.getLogger(__name__)
+
 
 class GroupService:
     """Service layer for group-related operations."""
 
-    def __init__(self, repo_factory, uow: UnitOfWork):
-        self.repo_factory = repo_factory
-        self.uow = uow
+    def __init__(self, repository_factory, unit_of_work: UnitOfWork):
+        self.repository_factory = repository_factory
+        self.unit_of_work = unit_of_work
 
     async def get_groups(self) -> List[GroupResponse]:
-        async with self.uow as uow:
-            repo = self.repo_factory(uow.session)
-            groups = await repo.get_list()
+        """Retrieve all groups."""
+        async with self.unit_of_work as unit_of_work:
+            group_repository = self.repository_factory(unit_of_work.session)
+            groups = await group_repository.get_list()
         return [GroupResponse.model_validate(group) for group in groups]
 
     async def create_group(self, group_data: GroupCreate) -> GroupResponse:
-        async with self.uow as uow:
-            repo = self.repo_factory(uow.session)
-            new_group = await repo.create(group_data)
+        """Create a new group."""
+        logger.info("Creating group")
+        async with self.unit_of_work as unit_of_work:
+            group_repository = self.repository_factory(unit_of_work.session)
+            new_group = await group_repository.create(group_data)
+        logger.info("Created group %s", new_group.id)
         return GroupResponse.model_validate(new_group)
 
     async def delete_group(self, group_id: int) -> None:
-        async with self.uow as uow:
-            repo = self.repo_factory(uow.session)
-            group = await repo.delete(group_id)
+        """Delete a group."""
+        logger.info("Deleting group %s", group_id)
+        async with self.unit_of_work as unit_of_work:
+            group_repository = self.repository_factory(unit_of_work.session)
+            group = await group_repository.delete(group_id)
         if group is None:
             raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
+        logger.info("Deleted group %s", group_id)
 
     async def update_group(self, group_id: int, group_data: GroupUpdate) -> GroupResponse:
-        async with self.uow as uow:
-            repo = self.repo_factory(uow.session)
-            group = await repo.update(group_id, group_data)
+        """Update group information."""
+        logger.info("Updating group %s", group_id)
+        async with self.unit_of_work as unit_of_work:
+            group_repository = self.repository_factory(unit_of_work.session)
+            group = await group_repository.update(group_id, group_data)
         if group is None:
             raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
+        logger.info("Updated group %s", group_id)
         return GroupResponse.model_validate(group)
 
     async def add_user_to_group(self, group_id: int, user_id: int) -> GroupResponse:
-        async with self.uow as uow:
-            repo = self.repo_factory(uow.session)
-            group = await repo.get(group_id, active_only=False)
+        """Add a user to a group."""
+        logger.info("Adding user %s to group %s", user_id, group_id)
+        async with self.unit_of_work as unit_of_work:
+            group_repository = self.repository_factory(unit_of_work.session)
+            group = await group_repository.get(group_id, active_only=False)
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
-            updated_group = await repo.add_users(group_id, {user_id: "member"})
+            updated_group = await group_repository.add_users(group_id, {user_id: "member"})
         assert updated_group is not None
+        logger.info("Added user %s to group %s", user_id, group_id)
         return GroupResponse.model_validate(updated_group)
 
     async def remove_user_from_group(self, group_id: int, user_id: int) -> GroupResponse:
-        async with self.uow as uow:
-            repo = self.repo_factory(uow.session)
-            group = await repo.get(group_id, active_only=False)
+        """Remove a user from a group."""
+        logger.info("Removing user %s from group %s", user_id, group_id)
+        async with self.unit_of_work as unit_of_work:
+            group_repository = self.repository_factory(unit_of_work.session)
+            group = await group_repository.get(group_id, active_only=False)
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
-            updated_group = await repo.remove_users(group_id, [user_id])
+            updated_group = await group_repository.remove_users(group_id, [user_id])
         assert updated_group is not None
+        logger.info("Removed user %s from group %s", user_id, group_id)
         return GroupResponse.model_validate(updated_group)

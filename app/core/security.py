@@ -17,16 +17,17 @@ from app.core.exceptions import AuthenticationError, AuthorizationError
 ALGORITHM = settings.current_config.algorithm
 ACCESS_TOKEN_EXPIRE_MINUTES = settings.current_config.access_token_expire_minutes
 RESET_TOKEN_EXPIRE_MINUTES = settings.current_config.reset_token_expire_minutes
+SECRET_KEY = settings.current_config.secret_key
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+password_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return password_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    return password_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
@@ -35,7 +36,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    return encode(to_encode, settings.current_config.secret_key, algorithm=ALGORITHM)
+    return encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def generate_reset_token() -> tuple[str, datetime]:
@@ -67,7 +68,7 @@ def decode_access_token(token: str) -> Dict[str, Any]:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_database_session),
+    session: AsyncSession = Depends(get_database_session),
 ) -> User:
     """Return the currently authenticated user based on the JWT token."""
     payload = decode_access_token(credentials.credentials)
@@ -75,8 +76,8 @@ async def get_current_user(
     if user_id is None:
         raise AuthenticationError("Invalid token payload")
 
-    stmt = select(User).where(User.id == bindparam("uid"))
-    result = await db.execute(stmt, {"uid": int(user_id)})
+    statement = select(User).where(User.id == bindparam("user_id_param"))
+    result = await session.execute(statement, {"user_id_param": int(user_id)})
     user = result.scalar_one_or_none()
     if user is None:
         raise AuthenticationError("User not found")

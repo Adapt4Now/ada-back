@@ -16,8 +16,8 @@ class UserRepository(BaseRepository[User]):
 
     model = User
 
-    def __init__(self, db: AsyncSession):
-        super().__init__(db)
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_all(self) -> List[User]:
         """Retrieve all users."""
@@ -67,8 +67,8 @@ class UserRepository(BaseRepository[User]):
 
     async def create_reset_token(self, email: str) -> str | None:
         """Create and store a password reset token for a user."""
-        stmt = select(User).where(User.email == bindparam("e"))
-        result = await self.db.execute(stmt, {"e": email})
+        statement = select(User).where(User.email == bindparam("email_param"))
+        result = await self.session.execute(statement, {"email_param": email})
         user = result.scalar_one_or_none()
         if user is None:
             return None
@@ -79,8 +79,8 @@ class UserRepository(BaseRepository[User]):
 
     async def reset_password(self, token: str, new_password: str) -> bool:
         """Reset user password using a valid reset token."""
-        stmt = select(User).where(User.reset_token == bindparam("t"))
-        result = await self.db.execute(stmt, {"t": token})
+        statement = select(User).where(User.reset_token == bindparam("token_param"))
+        result = await self.session.execute(statement, {"token_param": token})
         user = result.scalar_one_or_none()
         if user is None or not verify_reset_token(user, token):
             return False
@@ -93,19 +93,19 @@ class UserRepository(BaseRepository[User]):
     async def get_by_username_or_email(
         self, username: str | None = None, email: str | None = None
     ) -> User | None:
-        stmt = select(User)
-        params: dict[str, str] = {}
+        statement = select(User)
+        parameters: dict[str, str] = {}
         if username:
-            stmt = stmt.where(User.username == bindparam("u"))
-            params["u"] = username
+            statement = statement.where(User.username == bindparam("username_param"))
+            parameters["username_param"] = username
         elif email:
-            stmt = stmt.where(User.email == bindparam("e"))
-            params["e"] = email
-        result = await self.db.execute(stmt, params)
+            statement = statement.where(User.email == bindparam("email_param"))
+            parameters["email_param"] = email
+        result = await self.session.execute(statement, parameters)
         return result.scalar_one_or_none()
 
     async def get_all_with_relations(self) -> List[User]:
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(User).options(
                 selectinload(User.family),
                 selectinload(User.groups),
@@ -117,9 +117,9 @@ class UserRepository(BaseRepository[User]):
         return list(result.scalars().all())
 
     async def get_with_relations(self, user_id: int) -> User:
-        stmt = (
+        statement = (
             select(User)
-            .where(User.id == bindparam("uid"))
+            .where(User.id == bindparam("user_id_param"))
             .options(
                 selectinload(User.family),
                 selectinload(User.groups),
@@ -128,7 +128,7 @@ class UserRepository(BaseRepository[User]):
                 selectinload(User.settings),
             )
         )
-        result = await self.db.execute(stmt, {"uid": user_id})
+        result = await self.session.execute(statement, {"user_id_param": user_id})
         user = result.scalar_one_or_none()
         if user is None:
             raise UserNotFoundError

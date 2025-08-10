@@ -15,16 +15,16 @@ from app.domain.achievements.schemas import (
 class AchievementRepository:
     """Repository for managing achievements."""
 
-    def __init__(self, db: AsyncSession):
-        self.db = db
+    def __init__(self, session: AsyncSession):
+        self.session = session
 
     async def create(self, data: AchievementCreateSchema) -> AchievementResponseSchema:
         achievement = Achievement(**data.model_dump())
-        self.db.add(achievement)
+        self.session.add(achievement)
         return AchievementResponseSchema.model_validate(achievement)
 
     async def get(self, achievement_id: int) -> Optional[AchievementResponseSchema]:
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(Achievement).where(Achievement.id == achievement_id)
         )
         achievement = result.scalars().first()
@@ -33,14 +33,14 @@ class AchievementRepository:
         return AchievementResponseSchema.model_validate(achievement)
 
     async def get_all(self) -> List[AchievementResponseSchema]:
-        result = await self.db.execute(select(Achievement))
+        result = await self.session.execute(select(Achievement))
         achievements = result.scalars().all()
         return [AchievementResponseSchema.model_validate(a) for a in achievements]
 
     async def update(
         self, achievement_id: int, data: AchievementUpdateSchema
     ) -> Optional[AchievementResponseSchema]:
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(Achievement).where(Achievement.id == achievement_id)
         )
         achievement = result.scalars().first()
@@ -51,17 +51,17 @@ class AchievementRepository:
         return AchievementResponseSchema.model_validate(achievement)
 
     async def delete(self, achievement_id: int) -> bool:
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(Achievement).where(Achievement.id == achievement_id)
         )
         achievement = result.scalars().first()
         if achievement is None:
             return False
-        await self.db.delete(achievement)
+        await self.session.delete(achievement)
         return True
 
     async def award_to_user(self, achievement_id: int, user_id: int) -> None:
-        await self.db.execute(
+        await self.session.execute(
             insert(user_achievements)
             .values(user_id=user_id, achievement_id=achievement_id)
             .on_conflict_do_nothing()
@@ -70,7 +70,7 @@ class AchievementRepository:
     async def get_user_achievements(
         self, user_id: int
     ) -> List[AchievementResponseSchema]:
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(Achievement)
             .join(user_achievements, Achievement.id == user_achievements.c.achievement_id)
             .where(user_achievements.c.user_id == user_id)
@@ -80,7 +80,7 @@ class AchievementRepository:
 
     async def check_task_completion_achievements(self, user_id: int) -> None:
         """Award achievements for task completion milestones."""
-        result = await self.db.execute(
+        result = await self.session.execute(
             select(func.count(Task.id)).where(
                 Task.assigned_user_id == user_id, Task.is_completed.is_(True)
             )
@@ -89,14 +89,14 @@ class AchievementRepository:
         if completed_count < 1:
             return
 
-        achievement_result = await self.db.execute(
+        achievement_result = await self.session.execute(
             select(Achievement).where(Achievement.name == "First Task Completed")
         )
         achievement = achievement_result.scalar_one_or_none()
         if not achievement:
             return
 
-        await self.db.execute(
+        await self.session.execute(
             insert(user_achievements)
             .values(user_id=user_id, achievement_id=achievement.id)
             .on_conflict_do_nothing()
