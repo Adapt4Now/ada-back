@@ -12,6 +12,7 @@ from app.schemas.task import (
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
+from app.services.task_service import TaskService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -22,6 +23,12 @@ def get_task_repository(
     return TaskRepository(db)
 
 
+def get_task_service(
+    repo: TaskRepository = Depends(get_task_repository),
+) -> TaskService:
+    return TaskService(repo)
+
+
 @router.get(
     "/",
     response_model=List[TaskResponseSchema],
@@ -29,10 +36,10 @@ def get_task_repository(
 )
 async def get_tasks(
     include_archived: bool = False,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> List[TaskResponseSchema]:
     """Retrieve all tasks from the system."""
-    return await repo.get_all(include_archived)
+    return await service.get_tasks(include_archived)
 
 
 @router.post(
@@ -43,10 +50,10 @@ async def get_tasks(
 )
 async def create_task(
     task_data: TaskCreateSchema,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Create a new task with the provided data."""
-    return await repo.create(task_data)
+    return await service.create_task(task_data)
 
 
 @router.get(
@@ -57,10 +64,10 @@ async def create_task(
 async def get_task_by_id(
     task_id: int,
     include_archived: bool = False,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Get detailed information about a specific task."""
-    return await repo.get_by_id(task_id, include_archived)
+    return await service.get_task_by_id(task_id, include_archived)
 
 
 @router.put(
@@ -71,10 +78,10 @@ async def get_task_by_id(
 async def update_task(
     task_id: int,
     task_data: TaskUpdateSchema,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Update task information."""
-    return await repo.update(task_id, task_data)
+    return await service.update_task(task_id, task_data)
 
 
 @router.delete(
@@ -84,10 +91,10 @@ async def update_task(
 )
 async def delete_task(
     task_id: int,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> None:
     """Delete a task from the system."""
-    await repo.delete(task_id)
+    await service.delete_task(task_id)
 
 
 @router.post(
@@ -99,10 +106,10 @@ async def assign_task_to_user(
     task_id: int,
     user_id: int,
     assignment: TaskAssignUserSchema,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Assign a task to a specific user."""
-    return await repo.assign_to_user(task_id, user_id, assignment.assigned_by_user_id)
+    return await service.assign_task_to_user(task_id, user_id, assignment)
 
 
 @router.delete(
@@ -113,10 +120,10 @@ async def assign_task_to_user(
 async def unassign_task_from_user(
     task_id: int,
     user_id: int,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Remove the task assignment from a specific user."""
-    return await repo.unassign_from_user(task_id, user_id)
+    return await service.unassign_task_from_user(task_id, user_id)
 
 
 @router.post(
@@ -127,10 +134,10 @@ async def unassign_task_from_user(
 async def assign_task_to_groups(
     task_id: int,
     assignment: TaskAssignGroupsSchema,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Assign a task to multiple groups."""
-    return await repo.assign_to_groups(task_id, list(assignment.group_ids))
+    return await service.assign_task_to_groups(task_id, assignment)
 
 
 @router.delete(
@@ -141,10 +148,10 @@ async def assign_task_to_groups(
 async def unassign_task_from_group(
     task_id: int,
     group_id: int,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Remove the task assignment from a specific group."""
-    return await repo.unassign_from_group(task_id, group_id)
+    return await service.unassign_task_from_group(task_id, group_id)
 
 
 @router.post(
@@ -154,7 +161,7 @@ async def unassign_task_from_group(
 )
 async def restore_task(
     task_id: int,
-    repo: TaskRepository = Depends(get_task_repository),
+    service: TaskService = Depends(get_task_service),
 ) -> TaskResponseSchema:
     """Restore a previously archived task."""
-    return await repo.restore(task_id)
+    return await service.restore_task(task_id)
