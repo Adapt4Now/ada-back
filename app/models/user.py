@@ -14,7 +14,13 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
-from .associations import user_family_membership
+from typing import TYPE_CHECKING
+
+from .membership import GroupMembership, FamilyMembership
+
+if TYPE_CHECKING:
+    from app.models.group import Group
+    from app.models.family import Family
 
 
 class User(Base):
@@ -74,17 +80,31 @@ class User(Base):
         back_populates="members",
         foreign_keys="User.family_id",
     )
+    family_memberships = relationship(
+        "FamilyMembership",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
     families = relationship(
         "Family",
-        secondary=user_family_membership,
+        secondary="family_memberships",
         back_populates="premium_members",
+        lazy="selectin",
+        viewonly=True,
+    )
+    group_memberships = relationship(
+        "GroupMembership",
+        back_populates="user",
+        cascade="all, delete-orphan",
         lazy="selectin",
     )
     groups = relationship(
         "Group",
-        secondary="user_group_membership",
+        secondary="group_memberships",
         back_populates="users",
         lazy="selectin",
+        viewonly=True,
     )
 
     creator = relationship("User", remote_side=[id])

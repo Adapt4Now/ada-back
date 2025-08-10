@@ -2,11 +2,8 @@ from .user import User
 from .group import Group
 from .family import Family
 from .task import Task
-from .associations import (
-    task_group_association,
-    user_group_membership,
-    user_family_membership,
-)
+from .associations import task_group_association
+from .membership import GroupMembership, FamilyMembership
 from .setting import Setting
 from .notification import Notification
 
@@ -16,8 +13,8 @@ __all__ = [
     "Family",
     "Task",
     "task_group_association",
-    "user_group_membership",
-    "user_family_membership",
+    "GroupMembership",
+    "FamilyMembership",
     "Setting",
     "Notification",
 ]

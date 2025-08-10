@@ -6,11 +6,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
-from .associations import user_family_membership
 
 if TYPE_CHECKING:
     from .user import User
     from .group import Group
+    from .membership import FamilyMembership as FamilyMembershipType
 
 
 class Family(Base):
@@ -33,11 +33,17 @@ class Family(Base):
         back_populates="family",
         foreign_keys="User.family_id",
     )
+    premium_memberships: Mapped[List["FamilyMembershipType"]] = relationship(
+        "FamilyMembership",
+        back_populates="family",
+        cascade="all, delete-orphan",
+    )
     premium_members: Mapped[List["User"]] = relationship(
         "User",
-        secondary=user_family_membership,
+        secondary="family_memberships",
         back_populates="families",
         lazy="selectin",
+        viewonly=True,
     )
     groups: Mapped[List["Group"]] = relationship(
         "Group", back_populates="family", cascade="all, delete-orphan"
