@@ -10,7 +10,7 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.user import User
+from app.models.user import User, UserRole
 
 SECRET_KEY = os.getenv("SECRET_KEY", "secret")
 ALGORITHM = "HS256"
@@ -76,9 +76,9 @@ async def get_current_active_user(user: User = Depends(get_current_user)) -> Use
     return user
 
 
-async def get_current_superuser(user: User = Depends(get_current_active_user)) -> User:
+async def get_current_admin(user: User = Depends(get_current_active_user)) -> User:
     """Ensure the user has administrative privileges."""
-    if not user.is_superuser:
+    if user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return user
 
