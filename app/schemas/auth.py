@@ -12,3 +12,12 @@ class LoginSchema(BaseModel):
     password: str
 
     model_config = dict(str_strip_whitespace=True)
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirm(BaseModel):
+    token: str
+    new_password: str

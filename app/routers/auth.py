@@ -6,12 +6,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_database_session
 from app.schemas.user import UserCreateSchema, UserResponseSchema, UserUpdateSchema
 from app.schemas.family import FamilyCreate
-from app.schemas.auth import Token, LoginSchema
-from app.crud.user import create_user, update_user, verify_email
+from app.schemas.auth import (
+    LoginSchema,
+    PasswordResetConfirm,
+    PasswordResetRequest,
+    Token,
+)
+from app.crud.user import (
+    create_reset_token,
+    create_user,
+    reset_password,
+    update_user,
+)
 from app.crud.family import create_family
 from app.models.user import User
-from app.core.security import verify_password, create_access_token, decode_access_token
-
+from app.core.security import create_access_token, verify_password
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -57,16 +66,23 @@ async def login(
     return Token(access_token=token)
 
 
-@router.post("/verify-email", response_model=UserResponseSchema)
-async def verify_email_endpoint(
-    token: str,
+@router.post("/request-password-reset")
+async def request_password_reset(
+    data: PasswordResetRequest,
     db: AsyncSession = Depends(get_database_session),
-) -> UserResponseSchema:
-    payload = decode_access_token(token)
-    user_id = payload.get("sub")
-    if user_id is None:
-        raise HTTPException(status_code=400, detail="Invalid token")
-    user = await verify_email(db, int(user_id))
-    if user is None:
+):
+    token = await create_reset_token(db, data.email)
+    if token is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return UserResponseSchema.model_validate(user)
+    return {"reset_token": token}
+
+
+@router.post("/reset-password")
+async def apply_password_reset(
+    data: PasswordResetConfirm,
+    db: AsyncSession = Depends(get_database_session),
+):
+    success = await reset_password(db, data.token, data.new_password)
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+    return {"message": "Password reset successful"}
