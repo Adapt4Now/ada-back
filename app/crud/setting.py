@@ -5,22 +5,27 @@ from app.models.setting import Setting
 from app.schemas.setting import SettingUpdate
 
 
-async def get_or_create_settings(db: AsyncSession, user_id: int) -> Setting:
-    result = await db.execute(select(Setting).where(Setting.user_id == user_id))
-    setting = result.scalar_one_or_none()
-    if setting is None:
-        setting = Setting(user_id=user_id, notification_prefs={})
-        db.add(setting)
-        await db.commit()
-        await db.refresh(setting)
-    return setting
+class SettingRepository:
+    """Repository for managing user settings."""
 
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-async def update_settings(db: AsyncSession, user_id: int, data: SettingUpdate) -> Setting:
-    setting = await get_or_create_settings(db, user_id)
-    update_data = data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(setting, field, value)
-    await db.commit()
-    await db.refresh(setting)
-    return setting
+    async def get_or_create(self, user_id: int) -> Setting:
+        result = await self.db.execute(select(Setting).where(Setting.user_id == user_id))
+        setting = result.scalar_one_or_none()
+        if setting is None:
+            setting = Setting(user_id=user_id, notification_prefs={})
+            self.db.add(setting)
+            await self.db.commit()
+            await self.db.refresh(setting)
+        return setting
+
+    async def update(self, user_id: int, data: SettingUpdate) -> Setting:
+        setting = await self.get_or_create(user_id)
+        update_data = data.model_dump(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(setting, field, value)
+        await self.db.commit()
+        await self.db.refresh(setting)
+        return setting

@@ -18,7 +18,7 @@ from app.schemas.task import (
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
-from app.crud.achievement import check_task_completion_achievements
+from app.crud.achievement import AchievementRepository
 
 router = APIRouter(
     prefix="/tasks",
@@ -147,7 +147,9 @@ async def update_task(
 
     await db.commit()
     if new_status == TaskStatus.COMPLETED and task.assigned_user_id:
-        await check_task_completion_achievements(db, task.assigned_user_id)
+        await AchievementRepository(db).check_task_completion_achievements(
+            task.assigned_user_id
+        )
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
 
