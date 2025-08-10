@@ -118,6 +118,10 @@ async def update_task(
     for field, value in task_data.model_dump(exclude_unset=True).items():
         setattr(task, field, value)
 
+    task.updated_at = datetime.now(UTC)
+    if task_data.is_completed:
+        task.completed_at = datetime.now(UTC)
+
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
