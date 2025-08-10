@@ -17,8 +17,6 @@ class SettingRepository:
         if setting is None:
             setting = Setting(user_id=user_id, notification_prefs={})
             self.db.add(setting)
-            await self.db.commit()
-            await self.db.refresh(setting)
         return setting
 
     async def update(self, user_id: int, data: SettingUpdate) -> Setting:
@@ -26,6 +24,4 @@ class SettingRepository:
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(setting, field, value)
-        await self.db.commit()
-        await self.db.refresh(setting)
         return setting

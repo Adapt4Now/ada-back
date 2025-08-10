@@ -73,6 +73,11 @@ class DatabaseSessionManager:
             expire_on_commit=False
         )
 
+    @property
+    def session_factory(self) -> async_sessionmaker[AsyncSession]:
+        """Expose configured session factory."""
+        return self._session_factory
+
 
     async def close(self) -> None:
         """Close the database engine and release all resources."""
@@ -95,6 +100,32 @@ class DatabaseSessionManager:
 
 Base = declarative_base()
 
+
+class UnitOfWork:
+    """Unit of work for managing database transactions."""
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
+        self._session_factory = session_factory
+        self.session: AsyncSession | None = None
+
+    async def __aenter__(self) -> "UnitOfWork":
+        self.session = self._session_factory()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        if exc is not None and self.session is not None:
+            await self.session.rollback()
+        if self.session is not None:
+            await self.session.close()
+            self.session = None
+
+    async def commit(self) -> None:
+        if self.session is not None:
+            await self.session.commit()
+
+    async def rollback(self) -> None:
+        if self.session is not None:
+            await self.session.rollback()
 
 def create_db_manager(config: DatabaseConfig) -> DatabaseSessionManager:
     """Create a new instance of :class:`DatabaseSessionManager`.

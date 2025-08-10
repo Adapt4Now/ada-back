@@ -41,8 +41,6 @@ class BaseRepository(Generic[ModelType], Repository[ModelType]):
     async def create(self, data: dict) -> ModelType:
         obj = self.model(**data)
         self.db.add(obj)
-        await self.db.commit()
-        await self.db.refresh(obj)
         return obj
 
     async def update(self, obj_id: int, data: dict) -> Optional[ModelType]:
@@ -51,8 +49,6 @@ class BaseRepository(Generic[ModelType], Repository[ModelType]):
             return None
         for field, value in data.items():
             setattr(obj, field, value)
-        await self.db.commit()
-        await self.db.refresh(obj)
         return obj
 
     async def delete(self, obj_id: int) -> Optional[ModelType]:
@@ -60,7 +56,6 @@ class BaseRepository(Generic[ModelType], Repository[ModelType]):
         if obj is None:
             return None
         await self.db.delete(obj)
-        await self.db.commit()
         return obj
 
 

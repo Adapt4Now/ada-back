@@ -3,6 +3,7 @@ import logging
 
 from app.domain.users.repository import UserRepository
 from app.domain.families.repository import FamilyRepository
+from app.database import UnitOfWork
 from app.domain.users.schemas import (
     UserCreateSchema,
     UserResponseSchema,
@@ -25,18 +26,21 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """Service layer for authentication and authorization operations."""
 
-    def __init__(self, user_repo: UserRepository, family_repo: FamilyRepository):
-        self.user_repo = user_repo
-        self.family_repo = family_repo
+    def __init__(self, uow: UnitOfWork):
+        self.uow = uow
 
     async def register_user(self, user_data: UserCreateSchema) -> UserResponseSchema:
-        new_user = await self.user_repo.create(user_data)
-        family = await self.family_repo.create(
-            FamilyCreate(name=f"{new_user.username}'s family", created_by=new_user.id)
-        )
-        user = await self.user_repo.update(
-            new_user.id, UserUpdateSchema(family_id=family.id)
-        )
+        async with self.uow as uow:
+            user_repo = UserRepository(uow.session)
+            family_repo = FamilyRepository(uow.session)
+            new_user = await user_repo.create(user_data)
+            family = await family_repo.create(
+                FamilyCreate(name=f"{new_user.username}'s family", created_by=new_user.id)
+            )
+            user = await user_repo.update(
+                new_user.id, UserUpdateSchema(family_id=family.id)
+            )
+            await uow.commit()
         logger.info("Registered user %s", new_user.id)
         return UserResponseSchema.model_validate(user)
 
@@ -44,29 +48,37 @@ class AuthService:
         if not credentials.username and not credentials.email:
             raise AppError("Username or email required")
 
-        user = await self.user_repo.get_by_username_or_email(
-            credentials.username, credentials.email
-        )
-        if user is None or not verify_password(credentials.password, user.hashed_password):
-            raise AppError("Invalid credentials")
-
-        await self.user_repo.update(
-            user.id, UserUpdateSchema(last_login_at=datetime.now(UTC))
-        )
+        async with self.uow as uow:
+            user_repo = UserRepository(uow.session)
+            user = await user_repo.get_by_username_or_email(
+                credentials.username, credentials.email
+            )
+            if user is None or not verify_password(credentials.password, user.hashed_password):
+                raise AppError("Invalid credentials")
+            await user_repo.update(
+                user.id, UserUpdateSchema(last_login_at=datetime.now(UTC))
+            )
+            await uow.commit()
         token = create_access_token({"sub": str(user.id)})
         logger.info("User %s logged in", user.id)
         return Token(access_token=token)
 
     async def request_password_reset(self, data: PasswordResetRequest) -> dict:
-        token = await self.user_repo.create_reset_token(data.email)
-        if token is None:
-            raise UserNotFoundError()
+        async with self.uow as uow:
+            user_repo = UserRepository(uow.session)
+            token = await user_repo.create_reset_token(data.email)
+            if token is None:
+                raise UserNotFoundError()
+            await uow.commit()
         logger.info("Password reset requested for %s", data.email)
         return {"reset_token": token}
 
     async def apply_password_reset(self, data: PasswordResetConfirm) -> dict:
-        success = await self.user_repo.reset_password(data.token, data.new_password)
-        if not success:
-            raise AppError("Invalid or expired token")
+        async with self.uow as uow:
+            user_repo = UserRepository(uow.session)
+            success = await user_repo.reset_password(data.token, data.new_password)
+            if not success:
+                raise AppError("Invalid or expired token")
+            await uow.commit()
         logger.info("Password reset applied")
         return {"message": "Password reset successful"}

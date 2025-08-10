@@ -20,8 +20,6 @@ class FamilyRepository:
     async def create(self, family: FamilyCreate) -> Family:
         db_family = Family(name=family.name, created_by=family.created_by)
         self.db.add(db_family)
-        await self.db.commit()
-        await self.db.refresh(db_family)
 
         default_group = Group(
             name="general",
@@ -30,8 +28,6 @@ class FamilyRepository:
             family_id=db_family.id,
         )
         self.db.add(default_group)
-        await self.db.commit()
-        await self.db.refresh(default_group)
 
         self.db.add(
             GroupMembership(user_id=family.created_by, group_id=default_group.id, role="owner")
@@ -39,7 +35,6 @@ class FamilyRepository:
         self.db.add(
             FamilyMembership(user_id=family.created_by, family_id=db_family.id, role="owner")
         )
-        await self.db.commit()
 
         return db_family
 

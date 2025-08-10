@@ -52,7 +52,6 @@ class GroupRepository(BaseRepository[Group]):
         if not db_group:
             return None
         db_group.is_active = False
-        await self.db.commit()
         return db_group
 
     async def get_by_user(
@@ -88,8 +87,6 @@ class GroupRepository(BaseRepository[Group]):
                     set_={"role": role},
                 )
             )
-        await self.db.commit()
-        await self.db.refresh(db_group)
         return db_group
 
     async def remove_users(
@@ -104,6 +101,4 @@ class GroupRepository(BaseRepository[Group]):
                 GroupMembership.user_id.in_(user_ids),
             )
         )
-        await self.db.commit()
-        await self.db.refresh(db_group)
         return db_group
