@@ -3,14 +3,14 @@ from fastapi import APIRouter, Depends, status
 from dependency_injector.wiring import inject, Provide
 
 from app.dependencies import Container
-from .schemas import (
+from ..schemas import (
     TaskCreateSchema,
     TaskResponseSchema,
     TaskUpdateSchema,
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
-from .service import TaskService
+from ..service import TaskService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 

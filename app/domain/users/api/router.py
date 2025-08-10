@@ -4,13 +4,13 @@ from pydantic import BaseModel
 from dependency_injector.wiring import inject, Provide
 
 from app.dependencies import Container
-from .schemas import (
+from ..schemas import (
     UserResponseSchema,
     UserCreateSchema,
     UserUpdateSchema,
 )
-from .models import UserStatus
-from .service import UserService
+from ..models import UserStatus
+from ..service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
 
