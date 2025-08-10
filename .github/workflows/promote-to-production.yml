@@ -8,27 +8,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  preprod-tests:
+  open_pr:
     if: github.ref == 'refs/heads/master'
-    uses: ./.github/workflows/preprod-tests.yml
-    with:
-      python-version: '3.13'
-    secrets: inherit
-
-  open-pull-request:
-    if: github.ref == 'refs/heads/master'
-    needs: preprod-tests
     runs-on: ubuntu-latest
     permissions:
-      contents: write        # need write to read/compare/create PR metadata
+      contents: write
       pull-requests: write
       actions: read
+    outputs:
+      pr_number: ${{ steps.create.outputs.pr_number }}
+      head_sha:  ${{ steps.create.outputs.head_sha }}
+      skip:      ${{ steps.diff.outputs.skip }}
     steps:
       - name: Diff master vs production
         id: diff
         uses: actions/github-script@v7
         with:
-          github-token: ${{ github.token }}   # <-- no secret needed
+          github-token: ${{ github.token }}
           script: |
             const { owner, repo } = context.repo;
             const base = 'production';
@@ -42,41 +38,69 @@ jobs:
 
       - name: Create or find PR master → production
         if: steps.diff.outputs.skip != 'true'
+        id: create
         uses: actions/github-script@v7
         with:
-          github-token: ${{ github.token }}   # <-- no secret needed
+          github-token: ${{ github.token }}
           script: |
             const { owner, repo } = context.repo;
             const base = 'production';
             const head = 'master';
 
-            try {
-              const listResp = await github.rest.pulls.list({
-                owner, repo, state: 'open', base, head: `${owner}:${head}`
-              });
-              if (listResp.data.length > 0) {
-                const pr = listResp.data[0];
-                core.notice(`PR already open: #${pr.number}`);
-                core.setOutput('pr_number', pr.number.toString());
-                return;
-              }
-
-              const createResp = await github.rest.pulls.create({
-                owner, repo,
-                title: `Promote ${head} → ${base}`,
-                head, base,
-                body: 'Manual promotion. Review the changes and merge after checks are green.'
-              });
-              core.notice(`Created PR #${createResp.data.number}`);
-              core.setOutput('pr_number', createResp.data.number.toString());
-            } catch (e) {
-              if (e.status === 403) {
-                core.setFailed(
-                  "403: Creating PRs with GITHUB_TOKEN is blocked by repo/org settings. " +
-                  "Either enable 'Allow GitHub Actions to create and approve pull requests' " +
-                  "or switch to the PAT-based workflow."
-                );
-                return;
-              }
-              throw e;
+            // already open?
+            const open = await github.rest.pulls.list({ owner, repo, state: 'open', base, head: `${owner}:${head}` });
+            if (open.data.length) {
+              const pr = open.data[0];
+              core.notice(`PR already open: #${pr.number}`);
+              core.setOutput('pr_number', String(pr.number));
+              core.setOutput('head_sha', pr.head.sha);
+              return;
             }
+
+            // create PR
+            const pr = await github.rest.pulls.create({
+              owner, repo, title: `Promote ${head} → ${base}`, head, base,
+              body: 'Manual promotion. Review the changes and merge after checks are green.'
+            });
+            core.notice(`Created PR #${pr.data.number}`);
+            core.setOutput('pr_number', String(pr.data.number));
+            core.setOutput('head_sha', pr.data.head.sha);
+
+  tests:
+    if: needs.open_pr.outputs.skip != 'true'
+    needs: open_pr
+    runs-on: ubuntu-latest
+    name: tests
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.open_pr.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.3
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Cache venv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: ${{ runner.os }}-py3.13-poetry-${{ hashFiles('**/poetry.lock') }}
+
+      - name: Install dependencies (with dev)
+        run: poetry install --with dev --no-interaction
+
+      - name: Run tests
+        run: poetry run pytest
