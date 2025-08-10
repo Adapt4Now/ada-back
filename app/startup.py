@@ -6,21 +6,12 @@ from starlette.middleware.cors import CORSMiddleware
 import logging
 from pathlib import Path
 import importlib
+from types import ModuleType
 from app.core.logging import setup_logging
 from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
 from app.dependencies import container
-from app.domain.users import router as users_router
-from app.domain.tasks import router as tasks_router
-from app.domain.settings import router as settings_router
-from app.domain.admin import router as admin_router
-from app.domain.families import router as families_router
-from app.domain.auth import router as auth_router
-from app.domain.notifications import router as notifications_router
-from app.domain.reports import router as reports_router
-from app.domain.groups import router as groups_router
 from app.domain.users.models import User, UserRole
 from app.domain.users.schemas import UserCreateSchema, UserUpdateSchema
-from pydantic import EmailStr
 from app.domain.users.repository import UserRepository
 from app.core.error_handlers import (
     exception_handler,
@@ -67,9 +58,9 @@ async def lifespan(app: FastAPI):
     await db_manager.close()
 
 
-def discover_router_configs() -> List[Tuple[APIRouter, str]]:
+def discover_router_configs() -> List[Tuple[APIRouter, str, ModuleType]]:
     """Recursively discover routers in app/domain."""
-    router_configs: List[Tuple[APIRouter, str]] = []
+    router_configs: List[Tuple[APIRouter, str, ModuleType]] = []
     app_path = Path(__file__).resolve().parent
     domain_path = app_path / "domain"
     for router_file in domain_path.rglob("api/router.py"):
@@ -80,8 +71,9 @@ def discover_router_configs() -> List[Tuple[APIRouter, str]]:
         router = getattr(module, "router", None)
         if isinstance(router, APIRouter):
             tag = router_file.parent.parent.name.capitalize()
-            router_configs.append((router, tag))
+            router_configs.append((router, tag, module))
     return router_configs
+
 
 class ApplicationSetup:
     """Class for initialization and configuration of FastAPI application"""
@@ -101,38 +93,28 @@ class ApplicationSetup:
         """Configure CORS middleware"""
         self.app.add_middleware(CORSMiddleware, **self.CORS_SETTINGS)
 
-    def register_routers(self) -> None:
+    def register_routers(self) -> List[ModuleType]:
         """Register all application routers"""
+        modules: List[ModuleType] = []
         try:
-            for router, tag in discover_router_configs():
+            for router, tag, module in discover_router_configs():
                 self.app.include_router(router, prefix=self.API_PREFIX, tags=[tag])
                 logger.info(f"Router {tag} registered")
+                modules.append(module)
         except Exception as e:
             logger.error(f"Error registering routers: {e}")
             raise
+        return modules
 
     def initialize(self) -> FastAPI:
         """Initialize the application"""
         self.setup_cors()
-        self.register_routers()
+        modules = self.register_routers()
         self.app.add_exception_handler(AppError, exception_handler)
         self.app.add_exception_handler(HTTPException, http_exception_handler)
         self.app.add_exception_handler(Exception, general_exception_handler)
+        container.wire(modules=modules)
         return self.app
 
 
 app = ApplicationSetup().initialize()
-
-container.wire(
-    modules=[
-        users_router,
-        tasks_router,
-        settings_router,
-        admin_router,
-        families_router,
-        auth_router,
-        notifications_router,
-        reports_router,
-        groups_router,
-    ]
-)
