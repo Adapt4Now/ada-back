@@ -72,14 +72,14 @@ def discover_router_configs() -> List[Tuple[APIRouter, str]]:
     router_configs: List[Tuple[APIRouter, str]] = []
     app_path = Path(__file__).resolve().parent
     domain_path = app_path / "domain"
-    for router_file in domain_path.rglob("router.py"):
+    for router_file in domain_path.rglob("api/router.py"):
         relative = router_file.relative_to(app_path)
         module_parts = ("app",) + relative.with_suffix("").parts
         module_name = ".".join(module_parts)
         module = importlib.import_module(module_name)
         router = getattr(module, "router", None)
         if isinstance(router, APIRouter):
-            tag = router_file.parent.name.capitalize()
+            tag = router_file.parent.parent.name.capitalize()
             router_configs.append((router, tag))
     return router_configs
 

@@ -5,8 +5,8 @@ from dependency_injector.wiring import inject, Provide
 
 from app.dependencies import Container
 
-from .schemas import GroupCreate, GroupUpdate, GroupResponse
-from .service import GroupService
+from ..schemas import GroupCreate, GroupUpdate, GroupResponse
+from ..service import GroupService
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
