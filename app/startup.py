@@ -4,16 +4,9 @@ from fastapi import FastAPI, APIRouter
 from sqlalchemy import select, bindparam
 from starlette.middleware.cors import CORSMiddleware
 import logging
+from pathlib import Path
+import importlib
 from app.core.logging import setup_logging
-from app.domain.auth import router as auth
-from app.domain.tasks import router as tasks
-from app.domain.users import router as users
-from app.domain.groups import router as groups
-from app.domain.families import router as families
-from app.domain.reports import router as reports
-from app.domain.notifications import router as notifications
-from app.domain.settings import router as settings
-from app.domain.admin import router as admin
 from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
 from app.dependencies import container
 from app.domain.users.models import User, UserRole
@@ -64,6 +57,23 @@ async def lifespan(app: FastAPI):
     yield
     await db_manager.close()
 
+
+def discover_router_configs() -> List[Tuple[APIRouter, str]]:
+    """Recursively discover routers in app/domain."""
+    router_configs: List[Tuple[APIRouter, str]] = []
+    app_path = Path(__file__).resolve().parent
+    domain_path = app_path / "domain"
+    for router_file in domain_path.rglob("router.py"):
+        relative = router_file.relative_to(app_path)
+        module_parts = ("app",) + relative.with_suffix("").parts
+        module_name = ".".join(module_parts)
+        module = importlib.import_module(module_name)
+        router = getattr(module, "router", None)
+        if isinstance(router, APIRouter):
+            tag = router_file.parent.name.capitalize()
+            router_configs.append((router, tag))
+    return router_configs
+
 class ApplicationSetup:
     """Class for initialization and configuration of FastAPI application"""
 
@@ -77,17 +87,6 @@ class ApplicationSetup:
 
     def __init__(self) -> None:
         self.app = FastAPI(lifespan=lifespan)
-        self._router_configs: List[Tuple[APIRouter, str]] = [
-            (auth, "Auth"),
-            (families, "Families"),
-            (groups, "Groups"),
-            (tasks, "Tasks"),
-            (users, "Users"),
-            (reports, "Reports"),
-            (notifications, "Notifications"),
-            (settings, "Settings"),
-            (admin, "Admin"),
-        ]
 
     def setup_cors(self) -> None:
         """Configure CORS middleware"""
@@ -96,7 +95,7 @@ class ApplicationSetup:
     def register_routers(self) -> None:
         """Register all application routers"""
         try:
-            for router, tag in self._router_configs:
+            for router, tag in discover_router_configs():
                 self.app.include_router(router, prefix=self.API_PREFIX, tags=[tag])
                 logger.info(f"Router {tag} registered")
         except Exception as e:
