@@ -1,6 +1,5 @@
 from typing import List
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
@@ -19,7 +18,6 @@ from app.schemas.user import (
     UserUpdateSchema
 )
 from app.models.user import UserStatus
-from app.core.exceptions import UserNotFoundError
 
 router = APIRouter(
     prefix="/users",
@@ -77,13 +75,7 @@ async def get_user_details(
     Parameters:
     - **user_id**: unique identifier of the user
     """
-    try:
-        user = await crud_get_user(db, user_id)
-    except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    user = await crud_get_user(db, user_id)
     return UserResponseSchema.model_validate(user)
 
 
@@ -102,13 +94,7 @@ async def delete_user(
     Parameters:
     - **user_id**: unique identifier of the user to delete
     """
-    try:
-        await crud_delete_user(db, user_id)
-    except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    await crud_delete_user(db, user_id)
 
 
 @router.put(
@@ -128,13 +114,7 @@ async def update_user(
     - **user_id**: unique identifier of the user to update
     - **user_data**: updated user information
     """
-    try:
-        user = await crud_update_user(db, user_id, user_data)
-    except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    user = await crud_update_user(db, user_id, user_data)
     return UserResponseSchema.model_validate(user)
 
 
@@ -153,11 +133,5 @@ async def update_user_status_endpoint(
     db: AsyncSession = Depends(get_database_session),
 ) -> UserResponseSchema:
     """Update the status of a user."""
-    try:
-        user = await crud_update_user_status(db, user_id, status_data.status)
-    except UserNotFoundError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
+    user = await crud_update_user_status(db, user_id, status_data.status)
     return UserResponseSchema.model_validate(user)
