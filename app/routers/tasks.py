@@ -17,6 +17,7 @@ from app.schemas.task import (
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
+from app.crud.achievement import check_task_completion_achievements
 
 router = APIRouter(
     prefix="/tasks",
@@ -115,10 +116,13 @@ async def update_task(
             detail="Task not found"
         )
 
-    for field, value in task_data.model_dump(exclude_unset=True).items():
+    update_fields = task_data.model_dump(exclude_unset=True)
+    for field, value in update_fields.items():
         setattr(task, field, value)
 
     await db.commit()
+    if update_fields.get("is_completed") and task.assigned_user_id:
+        await check_task_completion_achievements(db, task.assigned_user_id)
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
 
