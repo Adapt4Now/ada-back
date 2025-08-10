@@ -1,6 +1,7 @@
 from typing import Annotated, Optional, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from app.models.user import UserStatus
 from .family import FamilyResponse
 from .group import GroupResponse
 from .task import TaskResponseSchema
@@ -70,6 +71,7 @@ class UserUpdateSchema(BaseModel):
     timezone: Optional[str] = None
     is_superuser: Optional[bool] = None
     is_premium: Optional[bool] = None
+    status: Optional[UserStatus] = None
     last_login_at: Optional[datetime] = None
     points: Optional[int] = None
     level: Optional[int] = None
@@ -86,6 +88,7 @@ class UserResponseSchema(UserSchemaBase):
     """Schema for user data response."""
     id: Annotated[int, Field(gt=0)]
     is_active: bool = Field(default=True)
+    status: UserStatus = Field(default=UserStatus.ACTIVE)
     is_superuser: bool = Field(default=False)
     is_premium: bool = Field(default=True)
     first_name: Optional[str] = None

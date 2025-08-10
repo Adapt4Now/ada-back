@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from datetime import datetime, UTC
 from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
 from app.core.security import hash_password
 
@@ -34,6 +34,7 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
         email=user_data.email,
         hashed_password=hashed_password,
         is_active=True,
+        status=UserStatus.ACTIVE,
         is_superuser=user_data.is_superuser,
         is_premium=user_data.is_premium,
         first_name=user_data.first_name,
@@ -96,3 +97,19 @@ async def delete_user(db: AsyncSession, user_id: int) -> bool:
     await db.delete(user)
     await db.commit()
     return True
+
+
+async def update_user_status(
+    db: AsyncSession, user_id: int, status: UserStatus
+) -> Optional[User]:
+    """Update only the status of a user."""
+    stmt = select(User).where(User.id == bindparam("uid"))
+    result = await db.execute(stmt, {"uid": user_id})
+    user = result.scalar_one_or_none()
+    if user is None:
+        return None
+    user.status = status
+    user.updated_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(user)
+    return user
