@@ -55,6 +55,11 @@ class TaskResponseSchema(TaskBaseSchema):
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+    is_archived: bool = Field(
+        default=False,
+        description="Indicates if the task is archived",
+    )
     assigned_user_id: Optional[int] = Field(
         None,
         gt=0,
