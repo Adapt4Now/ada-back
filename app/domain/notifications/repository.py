@@ -33,4 +33,5 @@ class NotificationRepository(BaseRepository[Notification]):
         return notification
 
     async def delete(self, notification_id: int) -> bool:
-        return await super().delete(notification_id) is not None
+        deleted = await super().delete(notification_id)
+        return deleted is not None
