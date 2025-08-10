@@ -57,8 +57,6 @@ class TaskRepository(BaseRepository[Task]):
         if db_task.status == TaskStatus.COMPLETED:
             db_task.completed_at = datetime.now(UTC)
         self.db.add(db_task)
-        await self.db.commit()
-        await self.db.refresh(db_task)
         return self._to_task_details(db_task)
 
     async def get_by_id(self, task_id: int, include_archived: bool = False) -> TaskResponseSchema:
@@ -137,12 +135,10 @@ class TaskRepository(BaseRepository[Task]):
             else:
                 task.completed_at = None
 
-        await self.db.commit()
         if update_data.get('is_completed') and task.assigned_user_id:
             await AchievementRepository(self.db).check_task_completion_achievements(
                 task.assigned_user_id
             )
-        await self.db.refresh(task)
         return self._to_task_details(task)
 
     async def delete(self, task_id: int) -> None:
@@ -162,7 +158,6 @@ class TaskRepository(BaseRepository[Task]):
             raise TaskNotFoundError
         task.deleted_at = datetime.now(UTC)
         task.is_archived = True
-        await self.db.commit()
 
     async def restore(self, task_id: int) -> TaskResponseSchema:
         """Restore an archived task by ID."""
@@ -172,8 +167,6 @@ class TaskRepository(BaseRepository[Task]):
             raise TaskNotFoundError(detail="Task not found or not archived")
         task.deleted_at = None
         task.is_archived = False
-        await self.db.commit()
-        await self.db.refresh(task)
         return self._to_task_details(task)
 
     async def assign_to_user(
@@ -219,8 +212,6 @@ class TaskRepository(BaseRepository[Task]):
         task.assigned_groups = groups
         task.updated_at = datetime.now(UTC)
 
-        await self.db.commit()
-        await self.db.refresh(task)
         return self._to_task_details(task)
 
     async def unassign_from_user(
@@ -241,8 +232,6 @@ class TaskRepository(BaseRepository[Task]):
         task.assigned_user_id = None
         task.assigned_by_user_id = None
         task.updated_at = datetime.now(UTC)
-        await self.db.commit()
-        await self.db.refresh(task)
         return self._to_task_details(task)
 
     async def unassign_from_group(
@@ -265,6 +254,4 @@ class TaskRepository(BaseRepository[Task]):
 
         task.assigned_groups.remove(group)
         task.updated_at = datetime.now(UTC)
-        await self.db.commit()
-        await self.db.refresh(task)
         return self._to_task_details(task)

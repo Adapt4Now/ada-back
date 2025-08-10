@@ -2,6 +2,7 @@ from typing import List
 import logging
 
 from .repository import UserRepository
+from app.database import UnitOfWork
 from .schemas import (
     UserCreateSchema,
     UserResponseSchema,
@@ -15,34 +16,50 @@ logger = logging.getLogger(__name__)
 class UserService:
     """Service layer for user-related operations."""
 
-    def __init__(self, repo: UserRepository):
-        self.repo = repo
+    def __init__(self, uow: UnitOfWork):
+        self.uow = uow
 
     async def create_user(self, user_data: UserCreateSchema) -> UserResponseSchema:
-        new_user = await self.repo.create(user_data)
+        async with self.uow as uow:
+            repo = UserRepository(uow.session)
+            new_user = await repo.create(user_data)
+            await uow.commit()
         logger.info("Created user %s", new_user.id)
         return UserResponseSchema.model_validate(new_user)
 
     async def get_users(self) -> List[UserResponseSchema]:
-        users = await self.repo.get_all()
+        async with self.uow as uow:
+            repo = UserRepository(uow.session)
+            users = await repo.get_all()
         return [UserResponseSchema.model_validate(user) for user in users]
 
     async def get_user(self, user_id: int) -> UserResponseSchema:
-        user = await self.repo.get_by_id(user_id)
+        async with self.uow as uow:
+            repo = UserRepository(uow.session)
+            user = await repo.get_by_id(user_id)
         return UserResponseSchema.model_validate(user)
 
     async def delete_user(self, user_id: int) -> None:
-        await self.repo.delete(user_id)
+        async with self.uow as uow:
+            repo = UserRepository(uow.session)
+            await repo.delete(user_id)
+            await uow.commit()
         logger.info("Deleted user %s", user_id)
 
     async def update_user(
         self, user_id: int, user_data: UserUpdateSchema
     ) -> UserResponseSchema:
-        user = await self.repo.update(user_id, user_data)
+        async with self.uow as uow:
+            repo = UserRepository(uow.session)
+            user = await repo.update(user_id, user_data)
+            await uow.commit()
         return UserResponseSchema.model_validate(user)
 
     async def update_status(
         self, user_id: int, status: UserStatus
     ) -> UserResponseSchema:
-        user = await self.repo.update_status(user_id, status)
+        async with self.uow as uow:
+            repo = UserRepository(uow.session)
+            user = await repo.update_status(user_id, status)
+            await uow.commit()
         return UserResponseSchema.model_validate(user)

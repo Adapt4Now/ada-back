@@ -30,8 +30,6 @@ class NotificationRepository(BaseRepository[Notification]):
         if notification is None:
             return None
         notification.is_read = True
-        await self.db.commit()
-        await self.db.refresh(notification)
         return notification
 
     async def delete(self, notification_id: int) -> bool:

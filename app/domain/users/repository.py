@@ -63,8 +63,6 @@ class UserRepository(BaseRepository[User]):
         user = await self.get_by_id(user_id)
         user.status = status
         user.updated_at = datetime.now(UTC)
-        await self.db.commit()
-        await self.db.refresh(user)
         return user
 
     async def create_reset_token(self, email: str) -> str | None:
@@ -77,7 +75,6 @@ class UserRepository(BaseRepository[User]):
         token, expires_at = generate_reset_token()
         user.reset_token = token
         user.reset_token_expires_at = expires_at
-        await self.db.commit()
         return token
 
     async def reset_password(self, token: str, new_password: str) -> bool:
@@ -91,7 +88,6 @@ class UserRepository(BaseRepository[User]):
         user.reset_token = None
         user.reset_token_expires_at = None
         user.updated_at = datetime.now(UTC)
-        await self.db.commit()
         return True
 
     async def get_by_username_or_email(

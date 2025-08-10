@@ -21,8 +21,6 @@ class AchievementRepository:
     async def create(self, data: AchievementCreateSchema) -> AchievementResponseSchema:
         achievement = Achievement(**data.model_dump())
         self.db.add(achievement)
-        await self.db.commit()
-        await self.db.refresh(achievement)
         return AchievementResponseSchema.model_validate(achievement)
 
     async def get(self, achievement_id: int) -> Optional[AchievementResponseSchema]:
@@ -50,8 +48,6 @@ class AchievementRepository:
             return None
         for field, value in data.model_dump(exclude_unset=True).items():
             setattr(achievement, field, value)
-        await self.db.commit()
-        await self.db.refresh(achievement)
         return AchievementResponseSchema.model_validate(achievement)
 
     async def delete(self, achievement_id: int) -> bool:
@@ -62,7 +58,6 @@ class AchievementRepository:
         if achievement is None:
             return False
         await self.db.delete(achievement)
-        await self.db.commit()
         return True
 
     async def award_to_user(self, achievement_id: int, user_id: int) -> None:
@@ -71,7 +66,6 @@ class AchievementRepository:
             .values(user_id=user_id, achievement_id=achievement_id)
             .on_conflict_do_nothing()
         )
-        await self.db.commit()
 
     async def get_user_achievements(
         self, user_id: int
@@ -107,4 +101,3 @@ class AchievementRepository:
             .values(user_id=user_id, achievement_id=achievement.id)
             .on_conflict_do_nothing()
         )
-        await self.db.commit()
