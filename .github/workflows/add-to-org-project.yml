@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1"
+  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1"  
 
 jobs:
   add-and-sync:
@@ -71,6 +71,7 @@ jobs:
             const prioField   = f('Priority');
             if (!statusField) core.setFailed('Field "Status" is missing in Project');
 
+            // Добавить карточку и взять её ID из результата
             const addRes = await github.graphql(
               `mutation($projectId:ID!,$contentId:ID!){
                  addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
@@ -81,10 +82,13 @@ jobs:
             );
             const projectItemId = addRes.addProjectV2ItemById.item.id;
 
+            // Маппинг меток -> поля
             const kindMap = { 'type:feature':'feature','type:bug':'bug','type:chore':'chore','type:docs':'docs','type:refactor':'refactor' };
-            const kindValue = Object.keys(kindMap).find(k => labelNames.includes(k)) ? kindMap[Object.keys(kindMap).find(k => labelNames.includes(k))] : null;
+            const kindKey = Object.keys(kindMap).find(k => labelNames.includes(k));
+            const kindValue = kindKey ? kindMap[kindKey] : null;
             const prioValue = ['P0','P1','P2'].find(p => labelNames.includes(p)) || null;
 
+            // Проставление single-select'ов
             async function setSelect(field, desired){
               if (!field || !desired) return;
               const opts = field.options || [];
@@ -93,7 +97,7 @@ jobs:
                 if (/inbox/i.test(desired)) opt = opts.find(o => /to *do|backlog|todo/i.test(o.name));
                 if (/done/i.test(desired))  opt = opts.find(o => /done/i.test(o.name));
               }
-              if (!opt) { core.warning(\`Option "\${desired}" not found in "\${field.name}"\`); return; }
+              if (!opt) { core.warning(`Option "${desired}" not found in "${field.name}"`); return; }
               await github.graphql(
                 `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:String!){
                   updateProjectV2ItemFieldValue(
@@ -110,4 +114,4 @@ jobs:
               setSelect(prioField,   prioValue),
             ]);
 
-            core.notice(\`Done. Status=Inbox Kind=\${kindValue||'-'} Priority=\${prioValue||'-'}\`);
+            core.notice(`Done. Status=Inbox Kind=${kindValue||'-'} Priority=${prioValue||'-'}`);
