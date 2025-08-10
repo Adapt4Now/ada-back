@@ -4,63 +4,95 @@ on:
   workflow_dispatch:
     inputs:
       require_green_master:
-        description: 'Требовать, чтобы последний прогон tests на master был зелёный'
+        description: 'Require the latest tests on master to be green'
         type: boolean
         default: true
+      tests_workflow_file:
+        description: 'Tests workflow file name (under .github/workflows)'
+        type: string
+        default: 'tests.yml'
 
 jobs:
   open-pull-request:
     runs-on: ubuntu-latest
     permissions:
-      contents: write         # чтобы читать/писать в репозиторий при необходимости
-      pull-requests: write    # чтобы создавать PR
-      actions: read           # чтобы читать статусы раннов
+      contents: write        # allow reading/writing repo contents when needed
+      pull-requests: write   # allow creating PRs
+      actions: read          # allow reading workflow run statuses
     steps:
       - name: Create or find PR master → production
         uses: actions/github-script@v7
         with:
           script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
+            const { owner, repo } = context.repo;
             const base = 'production';
             const head = 'master';
 
-            // 1) По желанию — проверяем, что последний ранн workflow "tests" на master зелёный
-            const requireGreen = core.getInput('require_green_master') === 'true';
+            // Read inputs from workflow_dispatch (strings by default)
+            const requireGreen = (context.payload.inputs?.require_green_master ?? 'true') === 'true';
+            const testsWorkflowFile = context.payload.inputs?.tests_workflow_file || 'tests.yml';
+
+            // 1) Optionally ensure latest tests on master are green
             if (requireGreen) {
-              const runs = await github.rest.actions.listWorkflowRuns({
-                owner, repo,
-                workflow_id: 'tests.yml',   // наш файл с тестами
+              const runsResp = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: testsWorkflowFile, // file name of the tests workflow
                 branch: head,
                 per_page: 1
               });
-              const last = runs.data.workflow_runs[0];
-              if (!last || last.conclusion !== 'success') {
+
+              const last = runsResp.data.workflow_runs?.[0];
+              if (!last) {
+                core.setFailed(`No workflow runs found for '${testsWorkflowFile}' on branch '${head}'.`);
+                return;
+              }
+              if (last.status !== 'completed' || last.conclusion !== 'success') {
                 core.setFailed(
-                  `Последний 'tests' на ${head} не зелёный. status=${last?.status}, conclusion=${last?.conclusion}`
+                  `Latest '${testsWorkflowFile}' on '${head}' is not green. status=${last.status}, conclusion=${last.conclusion}`
                 );
                 return;
               }
             }
 
-            // 2) Ищем уже открытый PR master → production
-            const prs = await github.rest.pulls.list({
-              owner, repo, state: 'open', base, head: `${owner}:${head}`
+            // 2) Check if an open PR from master to production already exists
+            const listResp = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: 'open',
+              base,
+              head: `${owner}:${head}`
             });
 
-            if (prs.data.length) {
-              core.notice(`PR уже открыт: #${prs.data[0].number}`);
-              core.setOutput('pr_number', prs.data[0].number);
+            if (listResp.data.length > 0) {
+              const pr = listResp.data[0];
+              core.notice(`PR already open: #${pr.number}`);
+              core.setOutput('pr_number', pr.number);
               return;
             }
 
-            // 3) Создаём новый PR
-            const pr = await github.rest.pulls.create({
-              owner, repo,
-              title: `Promote ${head} → ${base}`,
-              head, base,
-              body: 'Ручной промоут. Проверь изменения и смержи после зелёных чеков.'
-            });
+            // 3) Create a new PR
+            try {
+              const createResp = await github.rest.pulls.create({
+                owner,
+                repo,
+                title: `Promote ${head} → ${base}`,
+                head,
+                base,
+                body: 'Manual promotion. Review the changes and merge after checks are green.'
+              });
 
-            core.notice(`Создан PR #${pr.data.number}`);
-            core.setOutput('pr_number', pr.data.number);
+              core.notice(`Created PR #${createResp.data.number}`);
+              core.setOutput('pr_number', createResp.data.number);
+            } catch (e) {
+              // Helpful message if the repository/organization blocks PR creation by GITHUB_TOKEN
+              if (e.status === 403 && /not permitted to create or approve pull requests/i.test(e.message)) {
+                core.setFailed(
+                  "This repository blocks PR creation by GitHub Actions (GITHUB_TOKEN). " +
+                  "Either enable 'Allow GitHub Actions to create and approve pull requests' in repository/organization settings, " +
+                  "or use a machine-user PAT and an action like peter-evans/create-pull-request."
+                );
+                return;
+              }
+              throw e;
+            }
