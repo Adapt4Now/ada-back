@@ -1,0 +1,127 @@
+name: Project sync
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled, reopened, closed, edited, transferred]
+  pull_request:
+    types: [opened, ready_for_review, reopened, labeled, unlabeled, closed, edited]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  projects: write
+
+env:
+  # user-проект:   https://github.com/users/<OWNER>/projects/<NUMBER>
+  # org-проект:    https://github.com/orgs/<ORG>/projects/<NUMBER>
+  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync to Project (add & set fields)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const url = process.env.PROJECT_URL;
+            const mOrg = url.match(/github\.com\/orgs\/([^/]+)\/projects\/(\d+)/);
+            const mUser = url.match(/github\.com\/users\/([^/]+)\/projects\/(\d+)/);
+            if (!mOrg && !mUser) core.setFailed(`Bad PROJECT_URL: ${url}`);
+
+            const owner = (mOrg || mUser)[1];
+            const number = parseInt((mOrg || mUser)[2], 10);
+            const ownerIsOrg = !!mOrg;
+
+            // Figure out content (issue or PR)
+            const isIssue = !!context.payload.issue;
+            const isPR = !!context.payload.pull_request;
+            if (!isIssue && !isPR) return;
+
+            const nodeId = isIssue ? context.payload.issue.node_id : context.payload.pull_request.node_id;
+
+            // Get project id
+            const qProject = ownerIsOrg
+              ? `query($login:String!, $number:Int!){ organization(login:$login){ projectV2(number:$number){ id title fields(first:50){ nodes{ ... on ProjectV2FieldCommon{ id name dataType } ... on ProjectV2SingleSelectField{ id name dataType options{ id name } } } } } } }`
+              : `query($login:String!, $number:Int!){ user(login:$login){ projectV2(number:$number){ id title fields(first:50){ nodes{ ... on ProjectV2FieldCommon{ id name dataType } ... on ProjectV2SingleSelectField{ id name dataType options{ id name } } } } } } }`;
+
+            const projWrap = await github.graphql(qProject, { login: owner, number });
+            const project = ownerIsOrg ? projWrap.organization.projectV2 : projWrap.user.projectV2;
+            if (!project) core.setFailed(`Project not found by URL ${url}`);
+
+            const projectId = project.id;
+            const fields = project.fields.nodes;
+
+            // Helpers to find fields/options
+            const getField = (name) => fields.find(f => f.name === name);
+            const getOption = (field, name) => (field.options || []).find(o => o.name === name);
+
+            const statusField = getField('Status');
+            const kindField   = getField('Kind');      // ты создал своё поле Single select "Kind"
+            const prioField   = getField('Priority');  // и своё поле Single select "Priority"
+
+            // Add item to project (idempotent: вернёт существующий item, если уже есть)
+            const addRes = await github.graphql(`
+              mutation($projectId:ID!,$contentId:ID!){
+                addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
+                  item { id }
+                }
+              }`,
+              { projectId, contentId: nodeId }
+            );
+            const itemId = addRes.addProjectV2ItemById.item.id;
+
+            // Build desired field updates
+            const labelNames = (isIssue ? context.payload.issue.labels : context.payload.pull_request.labels || []).map(l => l.name);
+
+            // Map labels -> Kind
+            let kindValue = null;
+            const kindMap = [
+              ['type:feature','feature'],
+              ['type:bug','bug'],
+              ['type:chore','chore'],
+              ['type:docs','docs'],
+              ['type:refactor','refactor']
+            ];
+            for (const [lbl, val] of kindMap) if (labelNames.includes(lbl)) { kindValue = val; break; }
+
+            // Map labels -> Priority
+            let prioValue = null;
+            for (const p of ['P0','P1','P2']) if (labelNames.includes(p)) { prioValue = p; break; }
+
+            // Decide Status changes
+            let statusValue = null;
+            const action = context.payload.action;
+            const merged = isPR ? context.payload.pull_request.merged : false;
+            if (['opened','reopened','ready_for_review','transferred'].includes(action)) statusValue = 'Inbox';
+            if ((isIssue && action === 'closed') || (isPR && action === 'closed' && merged)) statusValue = 'Done';
+
+            // Update helper
+            async function setSingleSelect(field, optionName){
+              if (!field || !optionName) return;
+              const opt = getOption(field, optionName);
+              if (!opt) {
+                core.warning(`Option "${optionName}" not found in field "${field.name}"`);
+                return;
+              }
+              await github.graphql(`
+                mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:String!){
+                  updateProjectV2ItemFieldValue(
+                    input:{ projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{ singleSelectOptionId:$optionId } }
+                  ){
+                    projectV2Item { id }
+                  }
+                }`,
+                { projectId, itemId, fieldId: field.id, optionId: opt.id }
+              );
+            }
+
+            await Promise.all([
+              setSingleSelect(statusField, statusValue),
+              setSingleSelect(kindField,   kindValue),
+              setSingleSelect(prioField,   prioValue),
+            ]);
+
+            core.notice(`Project synced: item=${itemId} status=${statusValue||'-'} kind=${kindValue||'-'} prio=${prioValue||'-'}`);
