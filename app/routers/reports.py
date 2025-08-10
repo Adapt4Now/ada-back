@@ -14,10 +14,14 @@ router = APIRouter()
 
 @router.get("/tasks/reports/summary")
 async def get_task_summary(db: AsyncSession = Depends(get_database_session)):
-    total_result = await db.execute(select(func.count()).select_from(Task))
+    total_result = await db.execute(
+        select(func.count()).select_from(Task).where(Task.deleted_at.is_(None))
+    )
     total = total_result.scalar_one()
     completed_result = await db.execute(
-        select(func.count()).select_from(Task).where(Task.status == TaskStatus.COMPLETED)
+        select(func.count())
+        .select_from(Task)
+        .where(Task.is_completed.is_(True), Task.deleted_at.is_(None))
     )
     completed = completed_result.scalar_one()
     return {"total_tasks": total, "completed_tasks": completed}
@@ -25,7 +29,11 @@ async def get_task_summary(db: AsyncSession = Depends(get_database_session)):
 
 @router.get("/tasks/reports/user/{user_id}", response_model=List[TaskResponseSchema])
 async def get_user_task_report(user_id: int, db: AsyncSession = Depends(get_database_session)):
-    result = await db.execute(select(Task).where(Task.assigned_user_id == user_id))
+    result = await db.execute(
+        select(Task).where(
+            Task.assigned_user_id == user_id, Task.deleted_at.is_(None)
+        )
+    )
     tasks = result.scalars().all()
     return [TaskResponseSchema.model_validate(task) for task in tasks]
 
@@ -38,6 +46,7 @@ async def get_tasks_assigned_by_user(
         Task.assigned_by_user_id == user_id,
         Task.assigned_user_id.isnot(None),
         Task.assigned_user_id != user_id,
+        Task.deleted_at.is_(None),
     )
     result = await db.execute(stmt)
     tasks = result.scalars().all()
@@ -47,7 +56,12 @@ async def get_tasks_assigned_by_user(
 @router.get("/tasks/reports/group/{group_id}", response_model=List[TaskResponseSchema])
 async def get_group_task_report(group_id: int, db: AsyncSession = Depends(get_database_session)):
     result = await db.execute(
-        select(Task).join(task_group_association).where(task_group_association.c.group_id == group_id)
+        select(Task)
+        .join(task_group_association)
+        .where(
+            task_group_association.c.group_id == group_id,
+            Task.deleted_at.is_(None),
+        )
     )
     tasks = result.scalars().all()
     return [TaskResponseSchema.model_validate(task) for task in tasks]
@@ -64,7 +78,10 @@ async def get_user_groups_tasks(
             user_group_membership,
             task_group_association.c.group_id == user_group_membership.c.group_id,
         )
-        .where(user_group_membership.c.user_id == user_id)
+        .where(
+            user_group_membership.c.user_id == user_id,
+            Task.deleted_at.is_(None),
+        )
     )
     result = await db.execute(stmt)
     tasks = result.scalars().unique().all()

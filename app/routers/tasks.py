@@ -33,12 +33,15 @@ UTC = ZoneInfo("UTC")
     summary="Get all tasks"
 )
 async def get_tasks(
+        include_archived: bool = False,
         db: AsyncSession = Depends(get_database_session)
 ) -> List[TaskResponseSchema]:
     """
     Retrieve all tasks from the system.
     """
     query = select(Task)
+    if not include_archived:
+        query = query.where(Task.deleted_at.is_(None))
     result = await db.execute(query)
     tasks = result.scalars().all()
     return [TaskResponseSchema.model_validate(task) for task in tasks]
@@ -77,12 +80,15 @@ async def create_task(
 )
 async def get_task_by_id(
         task_id: int,
+        include_archived: bool = False,
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """
     Get detailed information about a specific task.
     """
     query = select(Task).where(Task.id == task_id)
+    if not include_archived:
+        query = query.where(Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -109,6 +115,7 @@ async def update_task(
     Update task information.
     """
     query = select(Task).where(Task.id == task_id)
+    query = query.where(Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -154,7 +161,7 @@ async def delete_task(
     """
     Delete a task from the system.
     """
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -164,7 +171,8 @@ async def delete_task(
             detail="Task not found"
         )
 
-    await db.delete(task)
+    task.deleted_at = datetime.now(UTC)
+    task.is_archived = True
     await db.commit()
 
 
@@ -180,7 +188,7 @@ async def assign_task_to_user(
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """Assign a task to a specific user."""
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -210,7 +218,7 @@ async def unassign_task_from_user(
     """
     Remove the task assignment from a specific user.
     """
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -244,7 +252,7 @@ async def assign_task_to_groups(
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """Assign a task to multiple groups."""
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -282,7 +290,7 @@ async def unassign_task_from_group(
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """Remove the task assignment from a specific group."""
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -303,6 +311,37 @@ async def unassign_task_from_group(
         )
 
     task.assigned_groups.remove(group)
+    await db.commit()
+    await db.refresh(task)
+    return TaskResponseSchema.model_validate(task)
+
+
+@router.post(
+    "/{task_id}/restore",
+    response_model=TaskResponseSchema,
+    summary="Restore archived task",
+)
+async def restore_task(
+        task_id: int,
+        db: AsyncSession = Depends(get_database_session)
+) -> TaskResponseSchema:
+    """Restore a previously archived task."""
+    query = select(Task).where(Task.id == task_id)
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    if task.deleted_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Task is not archived",
+        )
+    task.deleted_at = None
+    task.is_archived = False
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)

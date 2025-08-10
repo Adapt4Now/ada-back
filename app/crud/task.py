@@ -2,7 +2,7 @@ from typing import List, Optional
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task, TaskStatus
@@ -71,7 +71,9 @@ class TaskRepository:
         Returns:
             Task details if found, None otherwise
         """
-        query = select(Task).where(Task.id == task_id)
+        query = select(Task).where(
+            Task.id == task_id, Task.deleted_at.is_(None)
+        )
         result = await self.db.execute(query)
         task = result.scalars().first()
         if task is None:
@@ -85,7 +87,7 @@ class TaskRepository:
         Returns:
             List of task details
         """
-        query = select(Task)
+        query = select(Task).where(Task.deleted_at.is_(None))
         result = await self.db.execute(query)
         tasks = list(result.scalars().all())
         return [self._to_task_details(task) for task in tasks]
@@ -104,7 +106,9 @@ class TaskRepository:
         Raises:
             TaskNotFoundError: If task with given ID doesn't exist
         """
-        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        result = await self.db.execute(
+            select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
+        )
         task = result.scalars().first()
 
         if not task:
@@ -139,10 +143,28 @@ class TaskRepository:
         Returns:
             True if task was deleted, False if task wasn't found
         """
-        query = delete(Task).where(Task.id == task_id)
-        result = await self.db.execute(query)
+        result = await self.db.execute(
+            select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
+        )
+        task = result.scalars().first()
+        if not task:
+            return False
+        task.deleted_at = datetime.now(UTC)
+        task.is_archived = True
         await self.db.commit()
-        return bool(result.rowcount)
+        return True
+
+    async def restore(self, task_id: int) -> TaskResponseSchema:
+        """Restore an archived task by ID."""
+        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        task = result.scalars().first()
+        if not task or task.deleted_at is None:
+            raise TaskNotFoundError(f"Task with id {task_id} not found or not archived")
+        task.deleted_at = None
+        task.is_archived = False
+        await self.db.commit()
+        await self.db.refresh(task)
+        return self._to_task_details(task)
 
     async def assign_to_user(self, task_id: int, user_id: int) -> TaskResponseSchema:
         """
@@ -175,7 +197,9 @@ class TaskRepository:
         Raises:
             TaskNotFoundError: If a task with a given ID doesn't exist
         """
-        result = await self.db.execute(select(Task).where(Task.id == task_id))
+        result = await self.db.execute(
+            select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
+        )
         task = result.scalars().first()
 
         if not task:

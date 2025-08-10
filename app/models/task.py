@@ -49,10 +49,11 @@ class Task(Base):
         DateTime(timezone=True),
         nullable=True,
     )
-    due_date: Mapped[Optional[datetime]] = mapped_column(
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
     assigned_user_id: Mapped[Optional[int]] = mapped_column(
         Integer,
