@@ -1,8 +1,9 @@
 from typing import Annotated, List
 
 from fastapi import APIRouter, Depends, Path, status
+from dependency_injector.wiring import inject, Provide
 
-from app.dependencies import container
+from app.dependencies import Container
 
 from .schemas import GroupCreate, GroupUpdate, GroupResponse
 from .service import GroupService
@@ -16,8 +17,9 @@ router = APIRouter(prefix="/groups", tags=["groups"])
     summary="Get all groups",
     description="Retrieve all groups from the system.",
 )
+@inject
 async def get_groups(
-    service: GroupService = Depends(container.group_service),
+    service: GroupService = Depends(Provide[Container.group_service]),
 ) -> List[GroupResponse]:
     return await service.get_groups()
 
@@ -29,9 +31,10 @@ async def get_groups(
     summary="Create new group",
     description="Create a new group with the provided data.",
 )
+@inject
 async def create_group(
     group_data: GroupCreate,
-    service: GroupService = Depends(container.group_service),
+    service: GroupService = Depends(Provide[Container.group_service]),
 ) -> GroupResponse:
     return await service.create_group(group_data)
 
@@ -42,9 +45,10 @@ async def create_group(
     summary="Delete group",
     description="Delete a group from the system.",
 )
+@inject
 async def delete_group(
     group_id: Annotated[int, Path(gt=0)],
-    service: GroupService = Depends(container.group_service),
+    service: GroupService = Depends(Provide[Container.group_service]),
 ) -> None:
     await service.delete_group(group_id)
 
@@ -55,10 +59,11 @@ async def delete_group(
     summary="Update group",
     description="Update group information.",
 )
+@inject
 async def update_group(
     group_id: Annotated[int, Path(gt=0)],
     group_data: GroupUpdate,
-    service: GroupService = Depends(container.group_service),
+    service: GroupService = Depends(Provide[Container.group_service]),
 ) -> GroupResponse:
     return await service.update_group(group_id, group_data)
 
@@ -69,10 +74,11 @@ async def update_group(
     summary="Add user to group",
     description="Add a user to a specific group.",
 )
+@inject
 async def add_user_to_group(
     group_id: Annotated[int, Path(gt=0)],
     user_id: Annotated[int, Path(gt=0)],
-    service: GroupService = Depends(container.group_service),
+    service: GroupService = Depends(Provide[Container.group_service]),
 ) -> GroupResponse:
     return await service.add_user_to_group(group_id, user_id)
 
@@ -83,9 +89,10 @@ async def add_user_to_group(
     summary="Remove user from group",
     description="Remove a user from a specific group.",
 )
+@inject
 async def remove_user_from_group(
     group_id: Annotated[int, Path(gt=0)],
     user_id: Annotated[int, Path(gt=0)],
-    service: GroupService = Depends(container.group_service),
+    service: GroupService = Depends(Provide[Container.group_service]),
 ) -> GroupResponse:
     return await service.remove_user_from_group(group_id, user_id)
