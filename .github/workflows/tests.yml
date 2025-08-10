@@ -1,4 +1,4 @@
-name: tests
+name: Before production tests
 
 on:
   pull_request:
