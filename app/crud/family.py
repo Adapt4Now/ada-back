@@ -7,44 +7,42 @@ from app.models.membership import GroupMembership, FamilyMembership
 from app.schemas.family import FamilyCreate
 
 
-async def create_family(db: AsyncSession, family: FamilyCreate) -> Family:
-    db_family = Family(name=family.name, created_by=family.created_by)
-    db.add(db_family)
-    await db.commit()
-    await db.refresh(db_family)
+class FamilyRepository:
+    """Repository for managing families."""
 
-    # create default group
-    default_group = Group(
-        name="general",
-        description="Default group",
-        created_by="system",
-        family_id=db_family.id,
-    )
-    db.add(default_group)
-    await db.commit()
-    await db.refresh(default_group)
+    def __init__(self, db: AsyncSession):
+        self.db = db
 
-    # add creator to default group and family with owner role
-    db.add(
-        GroupMembership(
-            user_id=family.created_by, group_id=default_group.id, role="owner"
+    async def create(self, family: FamilyCreate) -> Family:
+        db_family = Family(name=family.name, created_by=family.created_by)
+        self.db.add(db_family)
+        await self.db.commit()
+        await self.db.refresh(db_family)
+
+        default_group = Group(
+            name="general",
+            description="Default group",
+            created_by="system",
+            family_id=db_family.id,
         )
-    )
-    db.add(
-        FamilyMembership(
-            user_id=family.created_by, family_id=db_family.id, role="owner"
+        self.db.add(default_group)
+        await self.db.commit()
+        await self.db.refresh(default_group)
+
+        self.db.add(
+            GroupMembership(user_id=family.created_by, group_id=default_group.id, role="owner")
         )
-    )
-    await db.commit()
+        self.db.add(
+            FamilyMembership(user_id=family.created_by, family_id=db_family.id, role="owner")
+        )
+        await self.db.commit()
 
-    return db_family
+        return db_family
 
+    async def get(self, family_id: int) -> Family | None:
+        result = await self.db.execute(select(Family).where(Family.id == family_id))
+        return result.scalar_one_or_none()
 
-async def get_family(db: AsyncSession, family_id: int) -> Family | None:
-    result = await db.execute(select(Family).where(Family.id == family_id))
-    return result.scalar_one_or_none()
-
-
-async def get_families(db: AsyncSession) -> list[Family]:
-    result = await db.execute(select(Family))
-    return list(result.scalars().all())
+    async def get_all(self) -> list[Family]:
+        result = await self.db.execute(select(Family))
+        return list(result.scalars().all())

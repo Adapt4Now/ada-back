@@ -84,28 +84,27 @@ class AchievementRepository:
         achievements = result.scalars().all()
         return [AchievementResponseSchema.model_validate(a) for a in achievements]
 
-
-async def check_task_completion_achievements(db: AsyncSession, user_id: int) -> None:
-    """Award achievements for task completion milestones."""
-    result = await db.execute(
-        select(func.count(Task.id)).where(
-            Task.assigned_user_id == user_id, Task.is_completed.is_(True)
+    async def check_task_completion_achievements(self, user_id: int) -> None:
+        """Award achievements for task completion milestones."""
+        result = await self.db.execute(
+            select(func.count(Task.id)).where(
+                Task.assigned_user_id == user_id, Task.is_completed.is_(True)
+            )
         )
-    )
-    completed_count = result.scalar_one() or 0
-    if completed_count < 1:
-        return
+        completed_count = result.scalar_one() or 0
+        if completed_count < 1:
+            return
 
-    achievement_result = await db.execute(
-        select(Achievement).where(Achievement.name == "First Task Completed")
-    )
-    achievement = achievement_result.scalar_one_or_none()
-    if not achievement:
-        return
+        achievement_result = await self.db.execute(
+            select(Achievement).where(Achievement.name == "First Task Completed")
+        )
+        achievement = achievement_result.scalar_one_or_none()
+        if not achievement:
+            return
 
-    await db.execute(
-        insert(user_achievements)
-        .values(user_id=user_id, achievement_id=achievement.id)
-        .on_conflict_do_nothing()
-    )
-    await db.commit()
+        await self.db.execute(
+            insert(user_achievements)
+            .values(user_id=user_id, achievement_id=achievement.id)
+            .on_conflict_do_nothing()
+        )
+        await self.db.commit()

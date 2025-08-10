@@ -12,7 +12,7 @@ from app.models.user import User
 from app.schemas.user import UserAdminResponseSchema, UserUpdateSchema
 from app.core.security import get_current_admin
 from app.models.user import UserRole
-from app.crud.user import update_user as crud_update_user
+from app.crud.user import UserRepository
 
 
 router = APIRouter(
@@ -20,6 +20,12 @@ router = APIRouter(
     tags=["admin"],
     dependencies=[Depends(get_current_admin)],
 )
+
+
+def get_user_repository(
+    db: AsyncSession = Depends(get_database_session),
+) -> UserRepository:
+    return UserRepository(db)
 
 
 @router.get("/users", response_model=List[UserAdminResponseSchema])
@@ -68,8 +74,8 @@ async def admin_get_user(
 @router.post("/users/{user_id}/make-admin", response_model=UserAdminResponseSchema)
 async def make_user_admin(
     user_id: int,
-    db: AsyncSession = Depends(get_database_session),
+    repo: UserRepository = Depends(get_user_repository),
 ) -> UserAdminResponseSchema:
     """Grant administrative rights to the specified user."""
-    user = await crud_update_user(db, user_id, UserUpdateSchema(role=UserRole.ADMIN))
+    user = await repo.update(user_id, UserUpdateSchema(role=UserRole.ADMIN))
     return UserAdminResponseSchema.model_validate(user)
