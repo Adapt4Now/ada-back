@@ -11,7 +11,7 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.user import User, UserRole
+from app.models.user import User, UserStatus
 
 SECRET_KEY = os.getenv("SECRET_KEY", "secret")
 ALGORITHM = "HS256"
@@ -89,8 +89,10 @@ async def get_current_user(
 
 async def get_current_active_user(user: User = Depends(get_current_user)) -> User:
     """Ensure the user is active."""
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+    if not user.is_active or user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user"
+        )
     return user
 
 

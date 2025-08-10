@@ -2,6 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from app.crud.user import (
     get_users as crud_get_users,
@@ -9,6 +10,7 @@ from app.crud.user import (
     get_user as crud_get_user,
     update_user as crud_update_user,
     delete_user as crud_delete_user,
+    update_user_status as crud_update_user_status,
 )
 from app.database import get_database_session
 from app.schemas.user import (
@@ -16,6 +18,7 @@ from app.schemas.user import (
     UserCreateSchema,
     UserUpdateSchema
 )
+from app.models.user import UserStatus
 
 router = APIRouter(
     prefix="/users",
@@ -123,6 +126,30 @@ async def update_user(
     - **user_data**: updated user information
     """
     user = await crud_update_user(db, user_id, user_data)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+    return UserResponseSchema.model_validate(user)
+
+
+class UserStatusUpdate(BaseModel):
+    status: UserStatus
+
+
+@router.put(
+    "/{user_id}/status",
+    response_model=UserResponseSchema,
+    summary="Update user status",
+)
+async def update_user_status_endpoint(
+    user_id: int,
+    status_data: UserStatusUpdate,
+    db: AsyncSession = Depends(get_database_session),
+) -> UserResponseSchema:
+    """Update the status of a user."""
+    user = await crud_update_user_status(db, user_id, status_data.status)
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

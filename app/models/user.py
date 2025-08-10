@@ -15,15 +15,17 @@ from sqlalchemy import (
 from sqlalchemy import true
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+import enum
 
 from app.database import Base
 from .associations import user_family_membership
 
 
-class UserRole(str, Enum):
-    USER = "USER"
-    PREMIUM = "PREMIUM"
-    ADMIN = "ADMIN"
+class UserStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    PENDING = "PENDING"
+    SUSPENDED = "SUSPENDED"
+    BANNED = "BANNED"
 
 
 class User(Base):
@@ -36,11 +38,14 @@ class User(Base):
     reset_token = Column(String, nullable=True, index=True)
     reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=true(), server_default=true())
-    role = Column(
-        SQLEnum(UserRole, name="userrole"),
+    status = Column(
+        SQLEnum(UserStatus, name="userstatus"),
         nullable=False,
-        server_default=UserRole.USER.value,
+        server_default="ACTIVE",
     )
+
+    is_superuser = Column(Boolean, nullable=False, server_default=text('false'))
+    is_premium = Column(Boolean, nullable=False, server_default=true())
     first_name = Column(String(150), nullable=True)
     last_name = Column(String(150), nullable=True)
     avatar_url = Column(String, nullable=True)
