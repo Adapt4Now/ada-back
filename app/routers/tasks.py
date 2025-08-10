@@ -1,16 +1,10 @@
-
 from typing import List
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.crud.task import TaskRepository
 from app.database import get_database_session
-from app.models.task import Task, TaskStatus
-from app.models.group import Group
-from app.models.user import User
 from app.schemas.task import (
     TaskCreateSchema,
     TaskResponseSchema,
@@ -18,215 +12,111 @@ from app.schemas.task import (
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
-from app.crud.achievement import AchievementRepository
-from app.core.exceptions import AppError, TaskNotFoundError, GroupNotFoundError
 
-router = APIRouter(
-    prefix="/tasks",
-    tags=["tasks"]
-)
+router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-UTC = ZoneInfo("UTC")
+
+def get_task_repository(
+    db: AsyncSession = Depends(get_database_session),
+) -> TaskRepository:
+    return TaskRepository(db)
 
 
 @router.get(
     "/",
     response_model=List[TaskResponseSchema],
-    summary="Get all tasks"
+    summary="Get all tasks",
 )
 async def get_tasks(
-        include_archived: bool = False,
-        db: AsyncSession = Depends(get_database_session)
+    include_archived: bool = False,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> List[TaskResponseSchema]:
-    """
-    Retrieve all tasks from the system.
-    """
-    query = select(Task)
-    if not include_archived:
-        query = query.where(Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    tasks = result.scalars().all()
-    return [TaskResponseSchema.model_validate(task) for task in tasks]
+    """Retrieve all tasks from the system."""
+    return await repo.get_all(include_archived)
 
 
 @router.post(
     "/",
     response_model=TaskResponseSchema,
     status_code=status.HTTP_201_CREATED,
-    summary="Create new task"
+    summary="Create new task",
 )
 async def create_task(
-        task_data: TaskCreateSchema,
-        db: AsyncSession = Depends(get_database_session)
+    task_data: TaskCreateSchema,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
-    """
-    Create a new task with the provided data.
-    """
-    new_task = Task(
-        **task_data.model_dump(),
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC)
-    )
-    if new_task.status == TaskStatus.COMPLETED:
-        new_task.completed_at = datetime.now(UTC)
-    db.add(new_task)
-    await db.commit()
-    await db.refresh(new_task)
-    return TaskResponseSchema.model_validate(new_task)
+    """Create a new task with the provided data."""
+    return await repo.create(task_data)
 
 
 @router.get(
     "/{task_id}",
     response_model=TaskResponseSchema,
-    summary="Get task by ID"
+    summary="Get task by ID",
 )
 async def get_task_by_id(
-        task_id: int,
-        include_archived: bool = False,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    include_archived: bool = False,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
-    """
-    Get detailed information about a specific task.
-    """
-    query = select(Task).where(Task.id == task_id)
-    if not include_archived:
-        query = query.where(Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    return TaskResponseSchema.model_validate(task)
+    """Get detailed information about a specific task."""
+    return await repo.get_by_id(task_id, include_archived)
 
 
 @router.put(
     "/{task_id}",
     response_model=TaskResponseSchema,
-    summary="Update task"
+    summary="Update task",
 )
 async def update_task(
-        task_id: int,
-        task_data: TaskUpdateSchema,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    task_data: TaskUpdateSchema,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
-    """
-    Update task information.
-    """
-    query = select(Task).where(Task.id == task_id)
-    query = query.where(Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    update_fields = task_data.model_dump(exclude_unset=True)
-    was_completed = task.status == TaskStatus.COMPLETED
-
-    new_status = update_fields.get("status")
-    for field, value in update_fields.items():
-        setattr(task, field, value)
-    task.updated_at = datetime.now(UTC)
-
-    if new_status is not None:
-        if new_status == TaskStatus.COMPLETED:
-            task.completed_at = datetime.now(UTC)
-            if not was_completed and task.assigned_user_id is not None:
-                user_result = await db.execute(select(User).where(User.id == task.assigned_user_id))
-                user = user_result.scalar_one_or_none()
-                if user:
-                    user.points += task.reward_points
-        else:
-            task.completed_at = None
-
-    await db.commit()
-    if new_status == TaskStatus.COMPLETED and task.assigned_user_id:
-        await AchievementRepository(db).check_task_completion_achievements(
-            task.assigned_user_id
-        )
-    await db.refresh(task)
-    return TaskResponseSchema.model_validate(task)
+    """Update task information."""
+    return await repo.update(task_id, task_data)
 
 
 @router.delete(
     "/{task_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete task"
+    summary="Delete task",
 )
 async def delete_task(
-        task_id: int,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> None:
-    """
-    Delete a task from the system.
-    """
-    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    task.deleted_at = datetime.now(UTC)
-    task.is_archived = True
-    await db.commit()
+    """Delete a task from the system."""
+    await repo.delete(task_id)
 
 
 @router.post(
     "/{task_id}/assign/user/{user_id}",
     response_model=TaskResponseSchema,
-    summary="Assign task to user"
+    summary="Assign task to user",
 )
 async def assign_task_to_user(
-        task_id: int,
-        user_id: int,
-        assignment: TaskAssignUserSchema,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    user_id: int,
+    assignment: TaskAssignUserSchema,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
     """Assign a task to a specific user."""
-    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    task.assigned_user_id = user_id
-    task.assigned_by_user_id = assignment.assigned_by_user_id
-    await db.commit()
-    await db.refresh(task)
-    return TaskResponseSchema.model_validate(task)
+    return await repo.assign_to_user(task_id, user_id, assignment.assigned_by_user_id)
 
 
 @router.delete(
     "/{task_id}/unassign/user/{user_id}",
     response_model=TaskResponseSchema,
-    summary="Unassign task from user"
+    summary="Unassign task from user",
 )
 async def unassign_task_from_user(
-        task_id: int,
-        user_id: int,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    user_id: int,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
-    """
-    Remove the task assignment from a specific user.
-    """
-    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    if task.assigned_user_id != user_id:
-        raise AppError("Task is not assigned to this user")
-
-    task.assigned_user_id = None
-    task.assigned_by_user_id = None
-    await db.commit()
-    await db.refresh(task)
-    return TaskResponseSchema.model_validate(task)
+    """Remove the task assignment from a specific user."""
+    return await repo.unassign_from_user(task_id, user_id)
 
 
 @router.post(
@@ -235,30 +125,12 @@ async def unassign_task_from_user(
     summary="Assign task to groups",
 )
 async def assign_task_to_groups(
-        task_id: int,
-        assignment: TaskAssignGroupsSchema,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    assignment: TaskAssignGroupsSchema,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
     """Assign a task to multiple groups."""
-    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    groups_result = await db.execute(
-        select(Group).where(Group.id.in_(list(assignment.group_ids)))
-    )
-    groups = list(groups_result.scalars().all())
-
-    if len(groups) != len(assignment.group_ids):
-        raise GroupNotFoundError("One or more groups not found")
-
-    task.assigned_groups = list(groups)
-    await db.commit()
-    await db.refresh(task)
-    return TaskResponseSchema.model_validate(task)
+    return await repo.assign_to_groups(task_id, list(assignment.group_ids))
 
 
 @router.delete(
@@ -267,29 +139,12 @@ async def assign_task_to_groups(
     summary="Unassign task from group",
 )
 async def unassign_task_from_group(
-        task_id: int,
-        group_id: int,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    group_id: int,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
     """Remove the task assignment from a specific group."""
-    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-
-    stmt = select(Group).where(Group.id == bindparam("gid"))
-    group_result = await db.execute(stmt, {"gid": group_id})
-    group = group_result.scalar_one_or_none()
-
-    if group is None or group not in task.assigned_groups:
-        raise AppError("Task is not assigned to this group")
-
-    task.assigned_groups.remove(group)
-    await db.commit()
-    await db.refresh(task)
-    return TaskResponseSchema.model_validate(task)
+    return await repo.unassign_from_group(task_id, group_id)
 
 
 @router.post(
@@ -298,20 +153,8 @@ async def unassign_task_from_group(
     summary="Restore archived task",
 )
 async def restore_task(
-        task_id: int,
-        db: AsyncSession = Depends(get_database_session)
+    task_id: int,
+    repo: TaskRepository = Depends(get_task_repository),
 ) -> TaskResponseSchema:
     """Restore a previously archived task."""
-    query = select(Task).where(Task.id == task_id)
-    result = await db.execute(query)
-    task = result.scalar_one_or_none()
-
-    if task is None:
-        raise TaskNotFoundError()
-    if task.deleted_at is None:
-        raise AppError("Task is not archived")
-    task.deleted_at = None
-    task.is_archived = False
-    await db.commit()
-    await db.refresh(task)
-    return TaskResponseSchema.model_validate(task)
+    return await repo.restore(task_id)

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User, UserStatus
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
-from app.core.security import hash_password
+from app.core.security import hash_password, generate_reset_token, verify_reset_token
 from app.core.exceptions import UserNotFoundError
 
 
@@ -84,3 +84,30 @@ class UserRepository:
         await self.db.commit()
         await self.db.refresh(user)
         return user
+
+    async def create_reset_token(self, email: str) -> str | None:
+        """Create and store a password reset token for a user."""
+        stmt = select(User).where(User.email == bindparam("e"))
+        result = await self.db.execute(stmt, {"e": email})
+        user = result.scalar_one_or_none()
+        if user is None:
+            return None
+        token, expires_at = generate_reset_token()
+        user.reset_token = token
+        user.reset_token_expires_at = expires_at
+        await self.db.commit()
+        return token
+
+    async def reset_password(self, token: str, new_password: str) -> bool:
+        """Reset user password using a valid reset token."""
+        stmt = select(User).where(User.reset_token == bindparam("t"))
+        result = await self.db.execute(stmt, {"t": token})
+        user = result.scalar_one_or_none()
+        if user is None or not verify_reset_token(user, token):
+            return False
+        user.hashed_password = hash_password(new_password)
+        user.reset_token = None
+        user.reset_token_expires_at = None
+        user.updated_at = datetime.now(UTC)
+        await self.db.commit()
+        return True

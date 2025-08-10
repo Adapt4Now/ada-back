@@ -19,7 +19,7 @@ from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manag
 from app.models.user import User, UserRole
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
-from app.crud.user import create_user as crud_create_user, update_user as crud_update_user
+from app.crud.user import UserRepository
 from app.core.error_handlers import exception_handler
 from app.core.exceptions import AppError
 
@@ -38,18 +38,18 @@ async def ensure_admin_user(db_manager: DatabaseSessionManager) -> None:
         stmt = select(User).where(User.username == bindparam("uname"))
         result = await db.execute(stmt, {"uname": "admin"})
         admin_user = result.scalar_one_or_none()
+        repo = UserRepository(db)
         if admin_user is None:
-            await crud_create_user(
-                db,
+            await repo.create(
                 UserCreateSchema(
                     username="admin",
                     email="admin@example.com",
                     password="password",
                     role=UserRole.ADMIN,
-                ),
+                )
             )
         elif admin_user.role != UserRole.ADMIN:
-            await crud_update_user(db, admin_user.id, UserUpdateSchema(role=UserRole.ADMIN))
+            await repo.update(admin_user.id, UserUpdateSchema(role=UserRole.ADMIN))
         break
 
 
