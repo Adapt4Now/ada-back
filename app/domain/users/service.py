@@ -1,12 +1,15 @@
 from typing import List
+import logging
 
-from app.crud.user import UserRepository
-from app.schemas.user import (
+from .repository import UserRepository
+from .schemas import (
     UserCreateSchema,
     UserResponseSchema,
     UserUpdateSchema,
 )
-from app.models.user import UserStatus
+from .models import UserStatus
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -17,6 +20,7 @@ class UserService:
 
     async def create_user(self, user_data: UserCreateSchema) -> UserResponseSchema:
         new_user = await self.repo.create(user_data)
+        logger.info("Created user %s", new_user.id)
         return UserResponseSchema.model_validate(new_user)
 
     async def get_users(self) -> List[UserResponseSchema]:
@@ -29,6 +33,7 @@ class UserService:
 
     async def delete_user(self, user_id: int) -> None:
         await self.repo.delete(user_id)
+        logger.info("Deleted user %s", user_id)
 
     async def update_user(
         self, user_id: int, user_data: UserUpdateSchema

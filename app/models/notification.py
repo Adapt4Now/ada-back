@@ -8,7 +8,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User  # noqa: F401
+    from app.domain.users.models import User  # noqa: F401
 
 
 class Notification(Base):

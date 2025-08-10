@@ -5,7 +5,7 @@ from typing import Annotated, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from pydantic import ConfigDict
 
-from app.models.task import TaskStatus
+from .models import TaskStatus
 
 UTC = ZoneInfo("UTC")
 

@@ -11,7 +11,7 @@ from app.database import Base
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.task import Task
-    from app.models.user import User
+    from app.domain.users.models import User
     from app.models.membership import GroupMembership as GroupMembershipType
 
 

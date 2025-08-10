@@ -1,13 +1,13 @@
 from typing import Annotated, Optional, List
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from app.models.user import UserStatus
-from .family import FamilyResponse
-from .group import GroupResponse
-from .task import TaskResponseSchema
-from .notification import NotificationResponse
-from .setting import SettingResponse
-from app.models.user import UserRole
+
+from .models import UserRole, UserStatus
+from app.schemas.family import FamilyResponse
+from app.schemas.group import GroupResponse
+from app.domain.tasks.schemas import TaskResponseSchema
+from app.schemas.notification import NotificationResponse
+from app.schemas.setting import SettingResponse
 
 # Validation constants
 MIN_USERNAME_LENGTH = 3

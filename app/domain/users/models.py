@@ -18,7 +18,7 @@ import enum
 from app.database import Base
 from typing import TYPE_CHECKING
 
-from .membership import GroupMembership, FamilyMembership
+from app.models.membership import GroupMembership, FamilyMembership
 
 if TYPE_CHECKING:
     from app.models.group import Group

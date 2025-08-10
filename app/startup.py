@@ -4,6 +4,7 @@ from fastapi import FastAPI, APIRouter
 from sqlalchemy import select, bindparam
 from starlette.middleware.cors import CORSMiddleware
 import logging
+from app.core.logging import setup_logging
 from app.routers import (
     auth,
     tasks,
@@ -16,21 +17,21 @@ from app.routers import (
     admin,
 )
 from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
-from app.models.user import User, UserRole
-from app.schemas.user import UserCreateSchema, UserUpdateSchema
+from app.domain.users.models import User, UserRole
+from app.domain.users.schemas import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
 from app.crud.user import UserRepository
-from app.core.error_handlers import exception_handler
+from app.core.error_handlers import (
+    exception_handler,
+    http_exception_handler,
+    general_exception_handler,
+)
 from app.core.exceptions import AppError
+from fastapi import HTTPException
 from app.core.config import settings
 
-# Logger setup
+setup_logging()
 logger = logging.getLogger(__name__)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
 
 
 async def ensure_admin_user(db_manager: DatabaseSessionManager) -> None:
@@ -66,12 +67,12 @@ async def lifespan(app: FastAPI):
 class ApplicationSetup:
     """Class for initialization and configuration of FastAPI application"""
 
-    API_PREFIX: str = settings.api_prefix
+    API_PREFIX: str = settings.current_config.api_prefix
     CORS_SETTINGS: dict[str, list[str] | bool] = {
-        "allow_origins": settings.cors_allow_origins,
-        "allow_credentials": settings.cors_allow_credentials,
-        "allow_methods": settings.cors_allow_methods,
-        "allow_headers": settings.cors_allow_headers,
+        "allow_origins": settings.current_config.cors_allow_origins,
+        "allow_credentials": settings.current_config.cors_allow_credentials,
+        "allow_methods": settings.current_config.cors_allow_methods,
+        "allow_headers": settings.current_config.cors_allow_headers,
     }
 
     def __init__(self) -> None:
@@ -107,6 +108,8 @@ class ApplicationSetup:
         self.setup_cors()
         self.register_routers()
         self.app.add_exception_handler(AppError, exception_handler)
+        self.app.add_exception_handler(HTTPException, http_exception_handler)
+        self.app.add_exception_handler(Exception, general_exception_handler)
         return self.app
 
 

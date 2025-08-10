@@ -16,7 +16,7 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 if TYPE_CHECKING:
-    from app.models.user import User
+from app.domain.users.models import User
 
 
 user_achievements = Table(

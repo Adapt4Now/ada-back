@@ -1,12 +1,25 @@
 from typing import Generic, List, Optional, Type, TypeVar
 
+from typing import Generic, List, Optional, Type, TypeVar, Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 ModelType = TypeVar("ModelType")
 
 
-class BaseRepository(Generic[ModelType]):
+class Repository(Protocol[ModelType]):
+    async def get(self, obj_id: int) -> Optional[ModelType]: ...
+
+    async def get_list(self, skip: int = 0, limit: int = 100) -> List[ModelType]: ...
+
+    async def create(self, data: dict) -> ModelType: ...
+
+    async def update(self, obj_id: int, data: dict) -> Optional[ModelType]: ...
+
+    async def delete(self, obj_id: int) -> Optional[ModelType]: ...
+
+
+class BaseRepository(Generic[ModelType], Repository[ModelType]):
     """Generic repository providing basic CRUD operations."""
 
     model: Type[ModelType]

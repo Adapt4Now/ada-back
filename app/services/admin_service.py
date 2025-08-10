@@ -1,47 +1,25 @@
 from typing import List
+import logging
 
-from sqlalchemy import select, bindparam
-from sqlalchemy.orm import selectinload
-from sqlalchemy.ext.asyncio import AsyncSession
+from app.domain.users.models import UserRole
+from app.domain.users.schemas import UserAdminResponseSchema, UserUpdateSchema
+from app.domain.users.repository import UserRepository
 
-from app.models.user import User, UserRole
-from app.schemas.user import UserAdminResponseSchema, UserUpdateSchema
-from app.crud.user import UserRepository
-from app.core.exceptions import UserNotFoundError
+logger = logging.getLogger(__name__)
 
 
 class AdminService:
     """Service layer for admin-related user operations."""
 
-    def __init__(self, db: AsyncSession, repo: UserRepository):
-        self.db = db
+    def __init__(self, repo: UserRepository):
         self.repo = repo
 
     async def get_users(self) -> List[UserAdminResponseSchema]:
-        result = await self.db.execute(
-            select(User).options(
-                selectinload(User.family),
-                selectinload(User.groups),
-                selectinload(User.tasks),
-                selectinload(User.notifications),
-                selectinload(User.settings),
-            )
-        )
-        users = result.scalars().all()
+        users = await self.repo.get_all_with_relations()
         return [UserAdminResponseSchema.model_validate(u) for u in users]
 
     async def get_user(self, user_id: int) -> UserAdminResponseSchema:
-        stmt = select(User).where(User.id == bindparam("uid")).options(
-            selectinload(User.family),
-            selectinload(User.groups),
-            selectinload(User.tasks),
-            selectinload(User.notifications),
-            selectinload(User.settings),
-        )
-        result = await self.db.execute(stmt, {"uid": user_id})
-        user = result.scalar_one_or_none()
-        if user is None:
-            raise UserNotFoundError()
+        user = await self.repo.get_with_relations(user_id)
         return UserAdminResponseSchema.model_validate(user)
 
     async def make_user_admin(self, user_id: int) -> UserAdminResponseSchema:

@@ -1,32 +1,17 @@
 from typing import List
-
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.task import TaskRepository
-from app.database import get_database_session
-from app.schemas.task import (
+from app.dependencies import get_task_service
+from .schemas import (
     TaskCreateSchema,
     TaskResponseSchema,
     TaskUpdateSchema,
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
-from app.services.task_service import TaskService
+from .service import TaskService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
-
-
-def get_task_repository(
-    db: AsyncSession = Depends(get_database_session),
-) -> TaskRepository:
-    return TaskRepository(db)
-
-
-def get_task_service(
-    repo: TaskRepository = Depends(get_task_repository),
-) -> TaskService:
-    return TaskService(repo)
 
 
 @router.get(

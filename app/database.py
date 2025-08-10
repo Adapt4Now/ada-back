@@ -31,11 +31,11 @@ class DatabaseConnectionError(SQLAlchemyError):
 @dataclass
 class DatabaseConfig:
     """Configuration for database connection."""
-    user: str = settings.db_user
-    password: str = settings.db_password
-    host: str = settings.db_host
-    port: int = settings.db_port
-    name: str = settings.db_name
+    user: str = settings.current_config.db_user
+    password: str = settings.current_config.db_password
+    host: str = settings.current_config.db_host
+    port: int = settings.current_config.db_port
+    name: str = settings.current_config.db_name
     pool: PoolConfig = field(default_factory=PoolConfig)
 
     @property

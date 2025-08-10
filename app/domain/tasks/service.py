@@ -1,13 +1,16 @@
 from typing import List
+import logging
 
-from app.crud.task import TaskRepository
-from app.schemas.task import (
+from .repository import TaskRepository
+from .schemas import (
     TaskCreateSchema,
     TaskResponseSchema,
     TaskUpdateSchema,
     TaskAssignGroupsSchema,
     TaskAssignUserSchema,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class TaskService:

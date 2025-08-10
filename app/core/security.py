@@ -10,13 +10,13 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.user import User, UserStatus, UserRole
+from app.domain.users.models import User, UserStatus, UserRole
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, AuthorizationError
 
-ALGORITHM = settings.algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
-RESET_TOKEN_EXPIRE_MINUTES = settings.reset_token_expire_minutes
+ALGORITHM = settings.current_config.algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.current_config.access_token_expire_minutes
+RESET_TOKEN_EXPIRE_MINUTES = settings.current_config.reset_token_expire_minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -35,7 +35,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    return encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
+    return encode(to_encode, settings.current_config.secret_key, algorithm=ALGORITHM)
 
 
 def generate_reset_token() -> tuple[str, datetime]:

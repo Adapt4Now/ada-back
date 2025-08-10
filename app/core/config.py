@@ -1,7 +1,9 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-class Settings(BaseSettings):
+
+class BaseConfig(BaseModel):
     db_user: str = "postgres"
     db_password: str = "password"
     db_host: str = "postgres_db"
@@ -19,6 +21,32 @@ class Settings(BaseSettings):
     cors_allow_methods: List[str] = ["*"]
     cors_allow_headers: List[str] = ["*"]
 
+
+class DevConfig(BaseConfig):
+    pass
+
+
+class ProdConfig(BaseConfig):
+    cors_allow_origins: List[str] = []
+
+
+class TestConfig(BaseConfig):
+    db_name: str = "tasks_test_db"
+
+
+class Settings(BaseSettings):
+    app_env: str = "dev"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        env = self.app_env.lower()
+        if env == "prod":
+            self.current_config: BaseConfig = ProdConfig()
+        elif env == "test":
+            self.current_config = TestConfig()
+        else:
+            self.current_config = DevConfig()
+
 
 settings = Settings()

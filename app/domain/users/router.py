@@ -1,27 +1,17 @@
 from typing import List
-
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
-from app.database import get_database_session
-from app.schemas.user import (
+from app.dependencies import get_user_service
+from .schemas import (
     UserResponseSchema,
     UserCreateSchema,
     UserUpdateSchema,
 )
-from app.models.user import UserStatus
-from app.services import UserService
-from app.crud.user import UserRepository
+from .models import UserStatus
+from .service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-
-def get_user_service(
-    db: AsyncSession = Depends(get_database_session),
-) -> UserService:
-    repo = UserRepository(db)
-    return UserService(repo)
 
 
 @router.post(
