@@ -20,6 +20,8 @@ from app.models.user import User, UserRole
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
 from app.crud.user import create_user as crud_create_user, update_user as crud_update_user
+from app.core.error_handlers import exception_handler
+from app.core.exceptions import AppError
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -103,6 +105,7 @@ class ApplicationSetup:
         """Initialize the application"""
         self.setup_cors()
         self.register_routers()
+        self.app.add_exception_handler(AppError, exception_handler)
         return self.app
 
 
