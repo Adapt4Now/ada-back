@@ -24,6 +24,11 @@ class TaskBaseSchema(BaseModel):
         default=None,
         description="Optional deadline for completing the task",
     )
+    reward_points: int = Field(
+        default=0,
+        ge=0,
+        description="Reward points for completing the task"
+    )
 
     class Config:
         from_attributes = True
@@ -57,7 +62,7 @@ class TaskUpdateSchema(BaseModel):
     is_completed: Optional[bool] = None
     assigned_user_id: Optional[int] = Field(None, gt=0)
     assigned_by_user_id: Optional[int] = Field(None, gt=0)
-    due_date: Optional[datetime] = None
+    reward_points: Optional[int] = Field(None, ge=0)
 
     class Config:
         from_attributes = True

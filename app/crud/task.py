@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task
 from app.models.group import Group
+from app.models.user import User
 from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
 
 UTC = ZoneInfo("UTC")
@@ -49,6 +50,7 @@ class TaskRepository:
         db_task = Task(
             title=task_data.title,
             description=task_data.description,
+            reward_points=task_data.reward_points,
             priority=task_data.priority,
             due_date=task_data.due_date,
             created_at=datetime.now(UTC),
@@ -110,12 +112,24 @@ class TaskRepository:
 
         update_data = task_data.model_dump(exclude_unset=True)
 
+        was_completed = task.is_completed
+
         for key, value in update_data.items():
             setattr(task, key, value)
 
         task.updated_at = datetime.now(UTC)
-        if update_data.get('is_completed'):
-            task.completed_at = datetime.now(UTC)
+        if update_data.get('is_completed') is not None:
+            if update_data['is_completed']:
+                task.completed_at = datetime.now(UTC)
+                if not was_completed and task.assigned_user_id is not None:
+                    user_result = await self.db.execute(
+                        select(User).where(User.id == task.assigned_user_id)
+                    )
+                    user = user_result.scalars().first()
+                    if user:
+                        user.points += task.reward_points
+            else:
+                task.completed_at = None
 
         await self.db.commit()
         await self.db.refresh(task)
