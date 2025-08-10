@@ -57,6 +57,7 @@ class TaskRepository(BaseRepository[Task]):
         if db_task.status == TaskStatus.COMPLETED:
             db_task.completed_at = datetime.now(UTC)
         self.session.add(db_task)
+        await self.session.flush()
         return self._to_task_details(db_task)
 
     async def get_by_id(self, task_id: int, include_archived: bool = False) -> TaskResponseSchema:
