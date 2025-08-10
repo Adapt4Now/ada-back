@@ -5,32 +5,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.notification import Notification
 from app.schemas.notification import NotificationCreate
+from app.crud.base import BaseRepository
 
 
-class NotificationRepository:
+class NotificationRepository(BaseRepository[Notification]):
     """Repository for managing notifications."""
 
+    model = Notification
+
     def __init__(self, db: AsyncSession):
-        self.db = db
+        super().__init__(db)
 
     async def get_by_user(self, user_id: int) -> List[Notification]:
         result = await self.db.execute(
-            select(Notification).where(Notification.user_id == user_id)
+            select(self.model).where(self.model.user_id == user_id)
         )
         return list(result.scalars().all())
 
     async def create(self, data: NotificationCreate) -> Notification:
-        notification = Notification(**data.model_dump())
-        self.db.add(notification)
-        await self.db.commit()
-        await self.db.refresh(notification)
-        return notification
+        return await super().create(data.model_dump())
 
     async def mark_as_read(self, notification_id: int) -> Optional[Notification]:
-        result = await self.db.execute(
-            select(Notification).where(Notification.id == notification_id)
-        )
-        notification = result.scalar_one_or_none()
+        notification = await self.get(notification_id)
         if notification is None:
             return None
         notification.is_read = True
@@ -39,12 +35,4 @@ class NotificationRepository:
         return notification
 
     async def delete(self, notification_id: int) -> bool:
-        result = await self.db.execute(
-            select(Notification).where(Notification.id == notification_id)
-        )
-        notification = result.scalar_one_or_none()
-        if notification is None:
-            return False
-        await self.db.delete(notification)
-        await self.db.commit()
-        return True
+        return await super().delete(notification_id) is not None

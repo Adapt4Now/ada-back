@@ -7,60 +7,50 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.group import Group
 from app.models.membership import GroupMembership
 from app.schemas.group import GroupCreate, GroupUpdate
+from app.crud.base import BaseRepository
 
 
-class GroupRepository:
+class GroupRepository(BaseRepository[Group]):
     """Repository for managing groups."""
 
+    model = Group
+
     def __init__(self, db: AsyncSession):
-        self.db = db
+        super().__init__(db)
 
     async def create(self, group: GroupCreate) -> Group:
-        db_group = Group(**group.model_dump())
-        self.db.add(db_group)
-        await self.db.commit()
-        await self.db.refresh(db_group)
-        return db_group
+        return await super().create(group.model_dump())
 
     async def get(self, group_id: int, active_only: bool = True) -> Optional[Group]:
-        query = select(Group).where(Group.id == group_id)
+        query = select(self.model).where(self.model.id == group_id)
         if active_only:
-            query = query.where(Group.is_active.is_(True))
+            query = query.where(self.model.is_active.is_(True))
         result = await self.db.execute(query)
         return result.scalar_one_or_none()
 
     async def get_list(
         self, skip: int = 0, limit: int = 100, active_only: bool = True
     ) -> List[Group]:
-        query = select(Group)
+        query = select(self.model)
         if active_only:
-            query = query.where(Group.is_active.is_(True))
-        query = query.order_by(Group.id).offset(skip).limit(limit)
+            query = query.where(self.model.is_active.is_(True))
+        query = query.order_by(self.model.id).offset(skip).limit(limit)
         result = await self.db.execute(query)
         groups = result.scalars().all()
         return cast(List[Group], list(groups))
 
     async def update(self, group_id: int, group_update: GroupUpdate) -> Optional[Group]:
-        db_group = await self.get(group_id, active_only=False)
-        if not db_group:
-            return None
-        update_data = group_update.model_dump(exclude_unset=True)
-        for field, value in update_data.items():
-            setattr(db_group, field, value)
-        await self.db.commit()
-        await self.db.refresh(db_group)
-        return db_group
+        return await super().update(group_id, group_update.model_dump(exclude_unset=True))
 
     async def delete(
         self, group_id: int, hard_delete: bool = False
     ) -> Optional[Group]:
+        if hard_delete:
+            return await super().delete(group_id)
         db_group = await self.get(group_id, active_only=False)
         if not db_group:
             return None
-        if hard_delete:
-            await self.db.delete(db_group)
-        else:
-            db_group.is_active = False
+        db_group.is_active = False
         await self.db.commit()
         return db_group
 
