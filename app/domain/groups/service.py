@@ -61,7 +61,8 @@ class GroupService:
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
             updated_group = await group_repository.add_users(group_id, {user_id: "member"})
-        assert updated_group is not None
+        if updated_group is None:
+            raise GroupNotFoundError("Failed to update group membership")
         logger.info("Added user %s to group %s", user_id, group_id)
         return GroupResponse.model_validate(updated_group)
 
@@ -74,6 +75,7 @@ class GroupService:
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
             updated_group = await group_repository.remove_users(group_id, [user_id])
-        assert updated_group is not None
+        if updated_group is None:
+            raise GroupNotFoundError("Failed to update group membership")
         logger.info("Removed user %s from group %s", user_id, group_id)
         return GroupResponse.model_validate(updated_group)
