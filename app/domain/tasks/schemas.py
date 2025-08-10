@@ -54,7 +54,9 @@ class TaskBaseSchema(BaseModel):
 class TaskCreateSchema(TaskBaseSchema):
     """Schema for creating a new task."""
     assigned_user_id: Optional[int] = Field(
-        ..., gt=0, description="ID of the user to assign; null for unassigned",
+        None,
+        gt=0,
+        description="ID of the user to assign; null for unassigned",
     )
     assigned_by_user_id: int = Field(
         ..., gt=0, description="ID of the user who assigns the task",
