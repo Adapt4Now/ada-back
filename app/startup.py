@@ -22,6 +22,7 @@ from pydantic import EmailStr
 from app.crud.user import UserRepository
 from app.core.error_handlers import exception_handler
 from app.core.exceptions import AppError
+from app.core.config import settings
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -65,12 +66,12 @@ async def lifespan(app: FastAPI):
 class ApplicationSetup:
     """Class for initialization and configuration of FastAPI application"""
 
-    API_PREFIX: str = "/api"
+    API_PREFIX: str = settings.api_prefix
     CORS_SETTINGS: dict[str, list[str] | bool] = {
-        "allow_origins": ["*"],
-        "allow_credentials": True,
-        "allow_methods": ["*"],
-        "allow_headers": ["*"],
+        "allow_origins": settings.cors_allow_origins,
+        "allow_credentials": settings.cors_allow_credentials,
+        "allow_methods": settings.cors_allow_methods,
+        "allow_headers": settings.cors_allow_headers,
     }
 
     def __init__(self) -> None:

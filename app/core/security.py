@@ -1,4 +1,3 @@
-import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
@@ -12,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
 from app.models.user import User, UserStatus, UserRole
+from app.core.config import settings
 from app.core.exceptions import AuthenticationError, AuthorizationError
 
-SECRET_KEY = os.getenv("SECRET_KEY", "secret")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
-RESET_TOKEN_EXPIRE_MINUTES = 60
+ALGORITHM = settings.algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+RESET_TOKEN_EXPIRE_MINUTES = settings.reset_token_expire_minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -36,7 +35,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    return encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
 
 
 def generate_reset_token() -> tuple[str, datetime]:
