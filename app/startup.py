@@ -9,6 +9,15 @@ import importlib
 from app.core.logging import setup_logging
 from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
 from app.dependencies import container
+from app.domain.users import router as users_router
+from app.domain.tasks import router as tasks_router
+from app.domain.settings import router as settings_router
+from app.domain.admin import router as admin_router
+from app.domain.families import router as families_router
+from app.domain.auth import router as auth_router
+from app.domain.notifications import router as notifications_router
+from app.domain.reports import router as reports_router
+from app.domain.groups import router as groups_router
 from app.domain.users.models import User, UserRole
 from app.domain.users.schemas import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
@@ -113,3 +122,17 @@ class ApplicationSetup:
 
 
 app = ApplicationSetup().initialize()
+
+container.wire(
+    modules=[
+        users_router,
+        tasks_router,
+        settings_router,
+        admin_router,
+        families_router,
+        auth_router,
+        notifications_router,
+        reports_router,
+        groups_router,
+    ]
+)

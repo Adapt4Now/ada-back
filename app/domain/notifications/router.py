@@ -1,18 +1,20 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, status
+from dependency_injector.wiring import inject, Provide
 
 from app.domain.notifications.schemas import NotificationResponse, NotificationCreate
 from app.domain.notifications.service import NotificationService
-from app.dependencies import container
+from app.dependencies import Container
 
 router = APIRouter()
 
 
 @router.get("/users/{user_id}/notifications", response_model=List[NotificationResponse])
+@inject
 async def get_notifications(
     user_id: int,
-    service: NotificationService = Depends(container.notification_service),
+    service: NotificationService = Depends(Provide[Container.notification_service]),
 ):
     return await service.get_notifications(user_id)
 
@@ -22,10 +24,11 @@ async def get_notifications(
     response_model=NotificationResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@inject
 async def create_notification(
     user_id: int,
     data: NotificationCreate,
-    service: NotificationService = Depends(container.notification_service),
+    service: NotificationService = Depends(Provide[Container.notification_service]),
 ):
     return await service.create_notification(user_id, data)
 
@@ -34,9 +37,10 @@ async def create_notification(
     "/users/notifications/read/{notification_id}",
     response_model=NotificationResponse,
 )
+@inject
 async def mark_notification_as_read(
     notification_id: int,
-    service: NotificationService = Depends(container.notification_service),
+    service: NotificationService = Depends(Provide[Container.notification_service]),
 ):
     return await service.mark_as_read(notification_id)
 
@@ -45,8 +49,9 @@ async def mark_notification_as_read(
     "/users/notifications/{notification_id}",
     status_code=status.HTTP_204_NO_CONTENT,
 )
+@inject
 async def delete_notification(
     notification_id: int,
-    service: NotificationService = Depends(container.notification_service),
+    service: NotificationService = Depends(Provide[Container.notification_service]),
 ):
     await service.delete_notification(notification_id)

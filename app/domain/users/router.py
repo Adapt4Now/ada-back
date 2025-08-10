@@ -1,8 +1,9 @@
 from typing import List
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
+from dependency_injector.wiring import inject, Provide
 
-from app.dependencies import container
+from app.dependencies import Container
 from .schemas import (
     UserResponseSchema,
     UserCreateSchema,
@@ -20,9 +21,10 @@ router = APIRouter(prefix="/users", tags=["users"])
     status_code=status.HTTP_201_CREATED,
     summary="Create new user",
 )
+@inject
 async def create_user(
     user_data: UserCreateSchema,
-    service: UserService = Depends(container.user_service),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> UserResponseSchema:
     """Create a new user."""
     return await service.create_user(user_data)
@@ -33,8 +35,9 @@ async def create_user(
     response_model=List[UserResponseSchema],
     summary="Get all users",
 )
+@inject
 async def get_users_list(
-    service: UserService = Depends(container.user_service),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> List[UserResponseSchema]:
     """Retrieve all users from the system."""
     return await service.get_users()
@@ -45,9 +48,10 @@ async def get_users_list(
     response_model=UserResponseSchema,
     summary="Get user by ID",
 )
+@inject
 async def get_user_details(
     user_id: int,
-    service: UserService = Depends(container.user_service),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> UserResponseSchema:
     """Get detailed information about a specific user."""
     return await service.get_user(user_id)
@@ -58,9 +62,10 @@ async def get_user_details(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete user",
 )
+@inject
 async def delete_user(
     user_id: int,
-    service: UserService = Depends(container.user_service),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> None:
     """Delete a user from the system."""
     await service.delete_user(user_id)
@@ -71,10 +76,11 @@ async def delete_user(
     response_model=UserResponseSchema,
     summary="Update user",
 )
+@inject
 async def update_user(
     user_id: int,
     user_data: UserUpdateSchema,
-    service: UserService = Depends(container.user_service),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> UserResponseSchema:
     """Update user information."""
     return await service.update_user(user_id, user_data)
@@ -89,10 +95,11 @@ class UserStatusUpdate(BaseModel):
     response_model=UserResponseSchema,
     summary="Update user status",
 )
+@inject
 async def update_user_status_endpoint(
     user_id: int,
     status_data: UserStatusUpdate,
-    service: UserService = Depends(container.user_service),
+    service: UserService = Depends(Provide[Container.user_service]),
 ) -> UserResponseSchema:
     """Update the status of a user."""
     return await service.update_status(user_id, status_data.status)
