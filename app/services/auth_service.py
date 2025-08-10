@@ -1,9 +1,13 @@
 from datetime import datetime, UTC
-from sqlalchemy import select, bindparam
+import logging
 
-from app.crud.user import UserRepository
+from app.domain.users.repository import UserRepository
 from app.crud.family import FamilyRepository
-from app.schemas.user import UserCreateSchema, UserResponseSchema, UserUpdateSchema
+from app.domain.users.schemas import (
+    UserCreateSchema,
+    UserResponseSchema,
+    UserUpdateSchema,
+)
 from app.schemas.family import FamilyCreate
 from app.schemas.auth import (
     LoginSchema,
@@ -11,9 +15,11 @@ from app.schemas.auth import (
     PasswordResetConfirm,
     Token,
 )
-from app.models.user import User
+from app.domain.users.models import User
 from app.core.security import create_access_token, verify_password
 from app.core.exceptions import AppError, UserNotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
@@ -31,23 +37,16 @@ class AuthService:
         user = await self.user_repo.update(
             new_user.id, UserUpdateSchema(family_id=family.id)
         )
+        logger.info("Registered user %s", new_user.id)
         return UserResponseSchema.model_validate(user)
 
     async def login(self, credentials: LoginSchema) -> Token:
         if not credentials.username and not credentials.email:
             raise AppError("Username or email required")
 
-        query = select(User)
-        params: dict[str, str] = {}
-        if credentials.username:
-            query = query.where(User.username == bindparam("u"))
-            params["u"] = credentials.username
-        else:
-            query = query.where(User.email == bindparam("e"))
-            params["e"] = credentials.email
-
-        result = await self.user_repo.db.execute(query, params)
-        user = result.scalar_one_or_none()
+        user = await self.user_repo.get_by_username_or_email(
+            credentials.username, credentials.email
+        )
         if user is None or not verify_password(credentials.password, user.hashed_password):
             raise AppError("Invalid credentials")
 
@@ -55,16 +54,19 @@ class AuthService:
             user.id, UserUpdateSchema(last_login_at=datetime.now(UTC))
         )
         token = create_access_token({"sub": str(user.id)})
+        logger.info("User %s logged in", user.id)
         return Token(access_token=token)
 
     async def request_password_reset(self, data: PasswordResetRequest) -> dict:
         token = await self.user_repo.create_reset_token(data.email)
         if token is None:
             raise UserNotFoundError()
+        logger.info("Password reset requested for %s", data.email)
         return {"reset_token": token}
 
     async def apply_password_reset(self, data: PasswordResetConfirm) -> dict:
         success = await self.user_repo.reset_password(data.token, data.new_password)
         if not success:
             raise AppError("Invalid or expired token")
+        logger.info("Password reset applied")
         return {"message": "Password reset successful"}

@@ -5,21 +5,24 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.task import Task, TaskStatus
+from app.crud.base import BaseRepository
+from .models import Task, TaskStatus
 from app.models.group import Group
-from app.models.user import User
-from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
+from app.domain.users.models import User
+from .schemas import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
 from app.crud.achievement import AchievementRepository
 from app.core.exceptions import AppError, TaskNotFoundError, GroupNotFoundError
 
 UTC = ZoneInfo("UTC")
 
 
-class TaskRepository:
+class TaskRepository(BaseRepository[Task]):
     """Repository for managing task operations in the database."""
 
+    model = Task
+
     def __init__(self, db: AsyncSession):
-        self.db = db
+        super().__init__(db)
 
     @staticmethod
     def _to_task_details(task: Task) -> TaskResponseSchema:
