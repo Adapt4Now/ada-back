@@ -9,6 +9,7 @@ from app.models.task import Task, TaskStatus
 from app.models.group import Group
 from app.models.user import User
 from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
+from app.crud.achievement import check_task_completion_achievements
 
 UTC = ZoneInfo("UTC")
 
@@ -130,6 +131,8 @@ class TaskRepository:
                 task.completed_at = None
 
         await self.db.commit()
+        if update_data.get('is_completed') and task.assigned_user_id:
+            await check_task_completion_achievements(self.db, task.assigned_user_id)
         await self.db.refresh(task)
         return self._to_task_details(task)
 

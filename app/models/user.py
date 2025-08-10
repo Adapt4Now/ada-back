@@ -105,4 +105,11 @@ class User(Base):
         lazy="selectin",
     )
 
+    achievements = relationship(
+        "Achievement",
+        secondary="user_achievements",
+        back_populates="users",
+        lazy="selectin",
+    )
+
     creator = relationship("User", remote_side=[id])
