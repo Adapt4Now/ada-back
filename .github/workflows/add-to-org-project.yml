@@ -2,13 +2,18 @@ name: Org Project add & sync (GitHub App)
 
 on:
   issues:
-    types: [opened]
+    types: [opened, reopened, closed]
+  pull_request:
+    types: [opened, reopened, closed]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: org-project-sync-${{ github.event.issue.number || github.run_id }}
+  group: org-project-sync-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -36,17 +41,66 @@ jobs:
         with:
           github-token: ${{ steps.app.outputs.token }}
           script: |
+            // ---- общие настройки
             const projectUrl = process.env.PROJECT_URL.trim();
             const m = projectUrl.match(/orgs\/([^/]+)\/projects\/(\d+)/);
             if (!m) core.setFailed(`PROJECT_URL must be https://github.com/orgs/<ORG>/projects/<N>. Got: ${projectUrl}`);
             const orgLogin = m[1];
             const projectNumber = parseInt(m[2], 10);
 
+            const eventName = context.eventName;             // issues / pull_request / issue_comment / workflow_dispatch
+            const action = context.payload.action;
+
+            // ---- коммент без /sync — пропускаем
+            if (eventName === 'issue_comment') {
+              const body = (context.payload.comment?.body || '').trim();
+              if (!/^\/sync\b/i.test(body)) {
+                core.notice('Comment without /sync — skipping');
+                return;
+              }
+            }
+
+            // ---- определяем целевой item (issue/PR)
             const ev = context.payload;
-            const nodeId = ev.issue.node_id;
-            const labels = ev.issue.labels || [];
+
+            async function loadIssue(owner, repo, num){
+              const { data } = await github.rest.issues.get({ owner, repo, issue_number: num });
+              return { nodeId: data.node_id, labels: data.labels || [], type: data.pull_request ? 'pr' : 'issue' };
+            }
+            async function loadPR(owner, repo, num){
+              const { data } = await github.rest.pulls.get({ owner, repo, pull_number: num });
+              return { nodeId: data.node_id, labels: data.labels || [], type: 'pr' };
+            }
+
+            let nodeId = null, labels = [], itemType = null;
+
+            if (eventName === 'issues' || eventName === 'issue_comment') {
+              // В events issues/issue_comment PR тоже приходит как "issue" — проверим и подгрузим как PR при необходимости
+              const number = ev.issue.number;
+              const owner = context.repo.owner;
+              const repo  = context.repo.repo;
+              const r = await loadIssue(owner, repo, number);
+              if (r.type === 'pr') {
+                const rp = await loadPR(owner, repo, number);
+                nodeId = rp.nodeId; labels = rp.labels; itemType = 'pr';
+              } else {
+                nodeId = r.nodeId; labels = r.labels; itemType = 'issue';
+              }
+            } else if (eventName === 'pull_request') {
+              nodeId = ev.pull_request.node_id;
+              labels = ev.pull_request.labels || [];
+              itemType = 'pr';
+            } else if (eventName === 'workflow_dispatch') {
+              core.notice('Manual dispatch without item context — nothing to do.');
+              return;
+            } else {
+              core.notice('Unsupported event — skipping');
+              return;
+            }
+
             const labelNames = labels.map(l => l.name);
 
+            // ---- тянем проект + поля
             const q = `query($login:String!, $number:Int!){
               organization(login:$login){
                 projectV2(number:$number){
@@ -63,6 +117,7 @@ jobs:
             const r = await github.graphql(q, { login: orgLogin, number: projectNumber });
             const project = r.organization?.projectV2;
             if (!project) core.setFailed(`Org Project not found by URL ${projectUrl}`);
+            core.info(`Project: ${project.title} (${project.url})`);
 
             const fields = project.fields.nodes || [];
             const f = n => fields.find(x => x.name === n);
@@ -71,24 +126,31 @@ jobs:
             const prioField   = f('Priority');
             if (!statusField) core.setFailed('Field "Status" is missing in Project');
 
-            // Добавить карточку и взять её ID из результата
+            // ---- добавляем карточку (идемпотентно) и берём её id из результата
             const addRes = await github.graphql(
               `mutation($projectId:ID!,$contentId:ID!){
-                 addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
-                   item { id }
-                 }
+                 addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } }
                }`,
               { projectId: project.id, contentId: nodeId }
             );
             const projectItemId = addRes.addProjectV2ItemById.item.id;
 
-            // Маппинг меток -> поля
+            // ---- маппинг меток -> поля
             const kindMap = { 'type:feature':'feature','type:bug':'bug','type:chore':'chore','type:docs':'docs','type:refactor':'refactor' };
-            const kindKey = Object.keys(kindMap).find(k => labelNames.includes(k));
-            const kindValue = kindKey ? kindMap[kindKey] : null;
+            const pickedKindKey = Object.keys(kindMap).find(k => labelNames.includes(k));
+            const kindValue = pickedKindKey ? kindMap[pickedKindKey] : null;
             const prioValue = ['P0','P1','P2'].find(p => labelNames.includes(p)) || null;
 
-            // Проставление single-select'ов
+            // ---- статус
+            let statusWanted = 'Inbox';
+            if ((eventName === 'issues' && action === 'closed') || (eventName === 'pull_request' && action === 'closed')) {
+              // PR merged=true/false — считаем "Done"; при желании разделим на Done/Cancelled позже
+              statusWanted = 'Done';
+            } else if (action === 'reopened') {
+              statusWanted = 'Inbox';
+            }
+
+            // ---- helper: выставить single-select
             async function setSelect(field, desired){
               if (!field || !desired) return;
               const opts = field.options || [];
@@ -106,12 +168,13 @@ jobs:
                 }`,
                 { projectId: project.id, itemId: projectItemId, fieldId: field.id, optionId: opt.id }
               );
+              core.info(`Set ${field.name} = ${opt.name}`);
             }
 
             await Promise.all([
-              setSelect(statusField, 'Inbox'),
+              setSelect(statusField, statusWanted),
               setSelect(kindField,   kindValue),
               setSelect(prioField,   prioValue),
             ]);
 
-            core.notice(`Done. Status=Inbox Kind=${kindValue||'-'} Priority=${prioValue||'-'}`);
+            core.notice(`Done. event=${eventName}/${action||'-'} Status=${statusWanted} Kind=${kindValue||'-'} Priority=${prioValue||'-'}`);
