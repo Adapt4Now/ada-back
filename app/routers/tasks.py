@@ -129,6 +129,7 @@ async def update_task(
             if user:
                 user.points += task.reward_points
 
+
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)

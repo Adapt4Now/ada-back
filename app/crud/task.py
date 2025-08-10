@@ -51,6 +51,8 @@ class TaskRepository:
             title=task_data.title,
             description=task_data.description,
             reward_points=task_data.reward_points,
+            priority=task_data.priority,
+            due_date=task_data.due_date,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC)
         )
