@@ -15,6 +15,7 @@ from app.domain.notifications import router as notifications
 from app.domain.settings import router as settings
 from app.domain.admin import router as admin
 from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
+from app.dependencies import container
 from app.domain.users.models import User, UserRole
 from app.domain.users.schemas import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan management."""
     db_manager = create_db_manager(DatabaseConfig())
     app.state.db_manager = db_manager
+    container.db_manager.override(db_manager)
     await ensure_admin_user(db_manager)
     yield
     await db_manager.close()

@@ -2,7 +2,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 
-from app.dependencies import get_user_service
+from app.dependencies import container
 from .schemas import (
     UserResponseSchema,
     UserCreateSchema,
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 )
 async def create_user(
     user_data: UserCreateSchema,
-    service: UserService = Depends(get_user_service),
+    service: UserService = Depends(container.user_service),
 ) -> UserResponseSchema:
     """Create a new user."""
     return await service.create_user(user_data)
@@ -34,7 +34,7 @@ async def create_user(
     summary="Get all users",
 )
 async def get_users_list(
-    service: UserService = Depends(get_user_service),
+    service: UserService = Depends(container.user_service),
 ) -> List[UserResponseSchema]:
     """Retrieve all users from the system."""
     return await service.get_users()
@@ -47,7 +47,7 @@ async def get_users_list(
 )
 async def get_user_details(
     user_id: int,
-    service: UserService = Depends(get_user_service),
+    service: UserService = Depends(container.user_service),
 ) -> UserResponseSchema:
     """Get detailed information about a specific user."""
     return await service.get_user(user_id)
@@ -60,7 +60,7 @@ async def get_user_details(
 )
 async def delete_user(
     user_id: int,
-    service: UserService = Depends(get_user_service),
+    service: UserService = Depends(container.user_service),
 ) -> None:
     """Delete a user from the system."""
     await service.delete_user(user_id)
@@ -74,7 +74,7 @@ async def delete_user(
 async def update_user(
     user_id: int,
     user_data: UserUpdateSchema,
-    service: UserService = Depends(get_user_service),
+    service: UserService = Depends(container.user_service),
 ) -> UserResponseSchema:
     """Update user information."""
     return await service.update_user(user_id, user_data)
@@ -92,7 +92,7 @@ class UserStatusUpdate(BaseModel):
 async def update_user_status_endpoint(
     user_id: int,
     status_data: UserStatusUpdate,
-    service: UserService = Depends(get_user_service),
+    service: UserService = Depends(container.user_service),
 ) -> UserResponseSchema:
     """Update the status of a user."""
     return await service.update_status(user_id, status_data.status)
