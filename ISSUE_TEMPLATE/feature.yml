@@ -1,0 +1,26 @@
+name: Feature
+description: Propose a new capability
+title: "feat: "
+labels: ["type:feature"]
+body:
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      placeholder: Short feature summary
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: User value / Why
+      description: Who benefits and how?
+  - type: textarea
+    id: ac
+    attributes:
+      label: Acceptance criteria (G/W/T)
+      description: Bullet list in Given/When/Then format
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes / Out of scope
