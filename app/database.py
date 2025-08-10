@@ -1,4 +1,3 @@
-import os
 from typing import AsyncGenerator
 from dataclasses import dataclass, field
 from fastapi import Request
@@ -6,22 +5,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, AsyncEngin
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 
-# Environment variable names
-ENV_DB_USER = "DB_USER"
-ENV_DB_PASSWORD = "DB_PASSWORD"
-ENV_DB_HOST = "DB_HOST"
-ENV_DB_PORT = "DB_PORT"
-ENV_DB_NAME = "DB_NAME"
-
-# Database default settings
-DEFAULT_DB_CREDENTIALS = {
-    "user": "postgres",
-    "password": "password",
-    "host": "postgres_db",
-    #"host": "localhost",
-    "port": "5432",
-    "name": "tasks_db"
-}
+from app.core.config import settings
 
 # Connection pool settings
 @dataclass
@@ -47,11 +31,11 @@ class DatabaseConnectionError(SQLAlchemyError):
 @dataclass
 class DatabaseConfig:
     """Configuration for database connection."""
-    user: str = os.getenv(ENV_DB_USER, DEFAULT_DB_CREDENTIALS["user"])
-    password: str = os.getenv(ENV_DB_PASSWORD, DEFAULT_DB_CREDENTIALS["password"])
-    host: str = os.getenv(ENV_DB_HOST, DEFAULT_DB_CREDENTIALS["host"])
-    port: str = os.getenv(ENV_DB_PORT, DEFAULT_DB_CREDENTIALS["port"])
-    name: str = os.getenv(ENV_DB_NAME, DEFAULT_DB_CREDENTIALS["name"])
+    user: str = settings.db_user
+    password: str = settings.db_password
+    host: str = settings.db_host
+    port: int = settings.db_port
+    name: str = settings.db_name
     pool: PoolConfig = field(default_factory=PoolConfig)
 
     @property
