@@ -1,12 +1,13 @@
 from typing import List, Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Path
+from fastapi import APIRouter, Depends, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
 from app.models.group import Group
 from app.schemas.group import GroupCreate, GroupUpdate, GroupResponse
 from app.crud.group import GroupRepository
+from app.core.exceptions import GroupNotFoundError
 
 router = APIRouter(prefix="/groups", tags=["groups"])
 
@@ -23,10 +24,7 @@ async def get_group_or_404(
 ) -> Group:
     group = await repo.get(group_id, active_only=False)
     if group is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Group with id {group_id} not found",
-        )
+        raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
     return group
 
 
@@ -70,10 +68,7 @@ async def delete_group(
 ) -> None:
     group = await repo.delete(group_id)
     if group is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Group with id {group_id} not found",
-        )
+        raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
 
 
 @router.put(
@@ -89,10 +84,7 @@ async def update_group(
 ) -> GroupResponse:
     group = await repo.update(group_id, group_data)
     if group is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Group with id {group_id} not found",
-        )
+        raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
     return GroupResponse.model_validate(group)
 
 

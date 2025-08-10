@@ -2,7 +2,7 @@
 
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy import select, bindparam
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ from app.schemas.user import UserAdminResponseSchema, UserUpdateSchema
 from app.core.security import get_current_admin
 from app.models.user import UserRole
 from app.crud.user import UserRepository
+from app.core.exceptions import UserNotFoundError
 
 
 router = APIRouter(
@@ -67,7 +68,7 @@ async def admin_get_user(
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        raise UserNotFoundError()
     return UserAdminResponseSchema.model_validate(user)
 
 

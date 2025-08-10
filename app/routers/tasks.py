@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from app.schemas.task import (
     TaskAssignUserSchema,
 )
 from app.crud.achievement import AchievementRepository
+from app.core.exceptions import AppError, TaskNotFoundError, GroupNotFoundError
 
 router = APIRouter(
     prefix="/tasks",
@@ -94,10 +95,7 @@ async def get_task_by_id(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
+        raise TaskNotFoundError()
 
     return TaskResponseSchema.model_validate(task)
 
@@ -121,10 +119,7 @@ async def update_task(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
+        raise TaskNotFoundError()
 
     update_fields = task_data.model_dump(exclude_unset=True)
     was_completed = task.status == TaskStatus.COMPLETED
@@ -171,10 +166,7 @@ async def delete_task(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
+        raise TaskNotFoundError()
 
     task.deleted_at = datetime.now(UTC)
     task.is_archived = True
@@ -198,10 +190,7 @@ async def assign_task_to_user(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
+        raise TaskNotFoundError()
 
     task.assigned_user_id = user_id
     task.assigned_by_user_id = assignment.assigned_by_user_id
@@ -228,16 +217,10 @@ async def unassign_task_from_user(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
-        )
+        raise TaskNotFoundError()
 
     if task.assigned_user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Task is not assigned to this user"
-        )
+        raise AppError("Task is not assigned to this user")
 
     task.assigned_user_id = None
     task.assigned_by_user_id = None
@@ -262,10 +245,7 @@ async def assign_task_to_groups(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found",
-        )
+        raise TaskNotFoundError()
 
     groups_result = await db.execute(
         select(Group).where(Group.id.in_(list(assignment.group_ids)))
@@ -273,10 +253,7 @@ async def assign_task_to_groups(
     groups = list(groups_result.scalars().all())
 
     if len(groups) != len(assignment.group_ids):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="One or more groups not found",
-        )
+        raise GroupNotFoundError("One or more groups not found")
 
     task.assigned_groups = list(groups)
     await db.commit()
@@ -300,20 +277,14 @@ async def unassign_task_from_group(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found",
-        )
+        raise TaskNotFoundError()
 
     stmt = select(Group).where(Group.id == bindparam("gid"))
     group_result = await db.execute(stmt, {"gid": group_id})
     group = group_result.scalar_one_or_none()
 
     if group is None or group not in task.assigned_groups:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Task is not assigned to this group",
-        )
+        raise AppError("Task is not assigned to this group")
 
     task.assigned_groups.remove(group)
     await db.commit()
@@ -336,15 +307,9 @@ async def restore_task(
     task = result.scalar_one_or_none()
 
     if task is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found",
-        )
+        raise TaskNotFoundError()
     if task.deleted_at is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Task is not archived",
-        )
+        raise AppError("Task is not archived")
     task.deleted_at = None
     task.is_archived = False
     await db.commit()
