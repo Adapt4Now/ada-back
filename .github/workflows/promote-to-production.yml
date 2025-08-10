@@ -1,0 +1,54 @@
+name: Promote to production
+
+on:
+  workflow_dispatch: {}
+
+concurrency:
+  group: promote-to-production
+  cancel-in-progress: true
+
+jobs:
+  open_pr:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Skip if no diff between master and production
+        id: diff
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const { owner, repo } = context.repo;
+            const base = 'production';
+            const head = 'master';
+            const cmp = await github.rest.repos.compareCommits({ owner, repo, base, head });
+            if (cmp.data.ahead_by === 0) {
+              core.notice('No differences between master and production. Nothing to promote.');
+              core.setOutput('skip', 'true');
+            } else {
+              core.setOutput('skip', 'false');
+            }
+
+      - name: Create or find PR master → production
+        if: steps.diff.outputs.skip != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ github.token }}  # use PAT here if org blocks GITHUB_TOKEN
+          script: |
+            const { owner, repo } = context.repo;
+            const base = 'production';
+            const head = 'master';
+            const open = await github.rest.pulls.list({ owner, repo, state: 'open', base, head: `${owner}:${head}` });
+            if (open.data.length) {
+              core.notice(`PR already open: #${open.data[0].number}`);
+              return;
+            }
+            const pr = await github.rest.pulls.create({
+              owner, repo, title: `Promote ${head} → ${base}`, head, base,
+              body: 'Manual promotion. Review the changes and merge after checks are green.'
+            });
+            core.notice(`Created PR #${pr.data.number}`);

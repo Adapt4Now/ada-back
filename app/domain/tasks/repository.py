@@ -50,6 +50,11 @@ class TaskRepository(BaseRepository[Task]):
         db_task = Task(
             title=task_data.title,
             description=task_data.description,
+            priority=task_data.priority,
+            reward_points=task_data.reward_points,
+            due_date=task_data.due_date,
+            assigned_user_id=task_data.assigned_user_id,
+            assigned_by_user_id=task_data.assigned_by_user_id,
             status=task_data.status,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
