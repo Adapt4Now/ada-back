@@ -4,7 +4,7 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.base import BaseRepository
+from app.domain.base import BaseRepository
 from .models import User, UserStatus
 from .schemas import UserCreateSchema, UserUpdateSchema
 from app.core.security import hash_password, generate_reset_token, verify_reset_token

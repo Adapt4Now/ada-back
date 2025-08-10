@@ -18,11 +18,12 @@ import enum
 from app.database import Base
 from typing import TYPE_CHECKING
 
-from app.models.membership import GroupMembership, FamilyMembership
+from app.domain.groups.membership import GroupMembership
+from app.domain.families.membership import FamilyMembership
 
 if TYPE_CHECKING:
-    from app.models.group import Group
-    from app.models.family import Family
+    from app.domain.groups.models import Group
+    from app.domain.families.models import Family
 
 
 class UserStatus(str, enum.Enum):

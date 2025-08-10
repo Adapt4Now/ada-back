@@ -5,12 +5,12 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.base import BaseRepository
+from app.domain.base import BaseRepository
 from .models import Task, TaskStatus
-from app.models.group import Group
+from app.domain.groups.models import Group
 from app.domain.users.models import User
 from .schemas import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
-from app.crud.achievement import AchievementRepository
+from app.domain.achievements.repository import AchievementRepository
 from app.core.exceptions import AppError, TaskNotFoundError, GroupNotFoundError
 
 UTC = ZoneInfo("UTC")
