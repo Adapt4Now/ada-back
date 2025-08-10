@@ -46,6 +46,10 @@ class Task(Base):
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
+    created_by_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
 
     assigned_user = relationship(
         "User",
@@ -56,6 +60,11 @@ class Task(Base):
         "User",
         back_populates="assigned_tasks",
         foreign_keys=[assigned_by_user_id],
+    )
+    created_by = relationship(
+        "User",
+        back_populates="created_tasks",
+        foreign_keys=[created_by_user_id],
     )
     assigned_groups: Mapped[List[Group]] = relationship(
         Group,

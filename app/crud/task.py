@@ -49,6 +49,10 @@ class TaskRepository:
         db_task = Task(
             title=task_data.title,
             description=task_data.description,
+            priority=task_data.priority,
+            assigned_user_id=task_data.assigned_user_id,
+            assigned_by_user_id=task_data.assigned_by_user_id,
+            created_by_user_id=task_data.created_by_user_id,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC)
         )

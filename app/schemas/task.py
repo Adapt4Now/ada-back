@@ -25,10 +25,19 @@ class TaskBaseSchema(BaseModel):
 class TaskCreateSchema(TaskBaseSchema):
     """Schema for creating a new task."""
     assigned_user_id: Optional[int] = Field(
-        ..., gt=0, description="ID of the user to assign; null for unassigned"
+        default=None,
+        gt=0,
+        description="ID of the user to assign; null for unassigned",
     )
-    assigned_by_user_id: int = Field(
-        ..., gt=0, description="ID of the user who assigns the task"
+    assigned_by_user_id: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="ID of the user who assigns the task",
+    )
+    created_by_user_id: int = Field(
+        ...,
+        gt=0,
+        description="ID of the user who created the task",
     )
 
 
@@ -40,6 +49,7 @@ class TaskUpdateSchema(BaseModel):
     is_completed: Optional[bool] = None
     assigned_user_id: Optional[int] = Field(None, gt=0)
     assigned_by_user_id: Optional[int] = Field(None, gt=0)
+    created_by_user_id: Optional[int] = Field(None, gt=0)
 
     class Config:
         from_attributes = True
@@ -64,6 +74,10 @@ class TaskResponseSchema(TaskBaseSchema):
         None,
         gt=0,
         description="ID of the user who assigned this task",
+    )
+    created_by_user_id: int = Field(
+        gt=0,
+        description="ID of the user who created this task",
     )
 
 class TaskAssignGroupsSchema(BaseModel):

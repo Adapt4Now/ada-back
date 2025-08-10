@@ -57,9 +57,14 @@ async def create_task(
     Create a new task with the provided data.
     """
     new_task = Task(
-        **task_data.model_dump(),
+        title=task_data.title,
+        description=task_data.description,
+        priority=task_data.priority,
+        assigned_user_id=task_data.assigned_user_id,
+        assigned_by_user_id=task_data.assigned_by_user_id,
+        created_by_user_id=task_data.created_by_user_id,
         created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC)
+        updated_at=datetime.now(UTC),
     )
     db.add(new_task)
     await db.commit()

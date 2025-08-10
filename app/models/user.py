@@ -68,6 +68,13 @@ class User(Base):
         foreign_keys="Task.assigned_by_user_id",
         lazy="selectin",
     )
+    # Tasks created by the user
+    created_tasks = relationship(
+        "Task",
+        back_populates="created_by",
+        foreign_keys="Task.created_by_user_id",
+        lazy="selectin",
+    )
 
     family = relationship(
         "Family",
