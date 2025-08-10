@@ -1,0 +1,207 @@
+name: Project sync
+
+on:
+  issues:
+    types: [opened, labeled, unlabeled, reopened, closed, edited, transferred]
+  pull_request:
+    types: [opened, ready_for_review, reopened, labeled, unlabeled, closed, edited, converted_to_draft, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      project_url:
+        description: 'Override project URL (optional)'
+        required: false
+        type: string
+      issue_number:
+        description: 'Issue number to sync (optional)'
+        required: false
+        type: number
+      pr_number:
+        description: 'PR number to sync (optional)'
+        required: false
+        type: number
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  projects: write
+
+env:
+  PROJECT_URL: "https://github.com/users/Adapt4Now/projects/1" # <— ЗАМЕНИ на свой Project (Users/… или Orgs/…)
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync to Project (add & set fields)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const inputUrl = core.getInput('project_url') || process.env.PROJECT_URL;
+            const url = inputUrl.trim();
+            core.info(`Project URL: ${url}`);
+
+            const mOrg = url.match(/github\.com\/orgs\/([^/]+)\/projects\/(\d+)/);
+            const mUser = url.match(/github\.com\/users\/([^/]+)\/projects\/(\d+)/);
+            if (!mOrg && !mUser) core.setFailed(`Bad PROJECT_URL (must be /users/<u>/projects/<n> or /orgs/<o>/projects/<n>): ${url}`);
+
+            const owner = (mOrg || mUser)[1];
+            const number = parseInt((mOrg || mUser)[2], 10);
+            const ownerIsOrg = !!mOrg;
+
+            const repo = context.repo.repo;
+            const repoOwner = context.repo.owner;
+
+            // Determine target item (issue/PR)
+            const inpIssue = core.getInput('issue_number');
+            const inpPR = core.getInput('pr_number');
+
+            let nodeId = null;
+            let itemType = null;
+
+            if (inpIssue) {
+              const { data } = await github.rest.issues.get({ owner: repoOwner, repo, issue_number: Number(inpIssue) });
+              nodeId = data.node_id;
+              itemType = 'issue';
+              core.info(`Manual issue mode: #${inpIssue} node_id=${nodeId}`);
+            } else if (inpPR) {
+              const { data } = await github.rest.pulls.get({ owner: repoOwner, repo, pull_number: Number(inpPR) });
+              nodeId = data.node_id;
+              itemType = 'pr';
+              core.info(`Manual PR mode: #${inpPR} node_id=${nodeId}`);
+            } else {
+              const isIssue = !!context.payload.issue;
+              const isPR = !!context.payload.pull_request;
+              if (!isIssue && !isPR) {
+                core.notice('No issue/PR in this event, skipping.');
+                return;
+              }
+              nodeId = isIssue ? context.payload.issue.node_id : context.payload.pull_request.node_id;
+              itemType = isIssue ? 'issue' : 'pr';
+            }
+
+            // Fetch project + fields
+            const q = ownerIsOrg
+              ? `query($login:String!, $number:Int!){
+                   organization(login:$login){
+                     projectV2(number:$number){
+                       id title url
+                       fields(first:50){
+                         nodes{
+                           ... on ProjectV2FieldCommon{ id name dataType }
+                           ... on ProjectV2SingleSelectField{ id name dataType options{ id name } }
+                         }
+                       }
+                     }
+                   }
+                 }`
+              : `query($login:String!, $number:Int!){
+                   user(login:$login){
+                     projectV2(number:$number){
+                       id title url
+                       fields(first:50){
+                         nodes{
+                           ... on ProjectV2FieldCommon{ id name dataType }
+                           ... on ProjectV2SingleSelectField{ id name dataType options{ id name } }
+                         }
+                       }
+                     }
+                   }
+                 }`;
+            const res = await github.graphql(q, { login: owner, number });
+            const project = ownerIsOrg ? res.organization?.projectV2 : res.user?.projectV2;
+            if (!project) core.setFailed(`Project not found by URL ${url}`);
+            core.info(`Project: ${project.title} (${project.url})`);
+
+            const fields = project.fields.nodes || [];
+            core.info('Fields: ' + fields.map(f => f.name + (f.options ? ' ['+f.options.map(o=>o.name).join(', ')+']' : '')).join(' | '));
+
+            const findField = (name) => fields.find(f => f.name === name);
+            const statusField = findField('Status');
+            const kindField   = findField('Kind');     // your custom field
+            const prioField   = findField('Priority'); // your custom field
+
+            if (!statusField) core.setFailed('Field "Status" not found in Project (it must exist).');
+
+            const addRes = await github.graphql(
+              `mutation($projectId:ID!,$contentId:ID!){
+                 addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}) {
+                   item { id }
+                 }
+               }`,
+              { projectId: project.id, contentId: nodeId }
+            );
+            const itemId = addRes.addProjectV2ItemById.item.id;
+            core.info(`Item in project: ${itemId} (type=${itemType})`);
+
+            // Labels
+            let labels = [];
+            if (context.payload.issue) labels = context.payload.issue.labels || [];
+            if (context.payload.pull_request) labels = context.payload.pull_request.labels || [];
+            // If manual mode, fetch labels
+            if ((inpIssue && itemType==='issue') || (inpPR && itemType==='pr')) {
+              if (itemType==='issue') {
+                const { data } = await github.rest.issues.get({ owner: repoOwner, repo, issue_number: Number(inpIssue) });
+                labels = data.labels;
+              } else {
+                const { data } = await github.rest.pulls.get({ owner: repoOwner, repo, pull_number: Number(inpPR) });
+                labels = data.labels;
+              }
+            }
+            const labelNames = labels.map(l => l.name);
+            core.info('Labels: ' + JSON.stringify(labelNames));
+
+            // Map -> Kind / Priority
+            const labelPick = (arr) => arr.find(x => labelNames.includes(x));
+            const kindMap = { 'type:feature':'feature','type:bug':'bug','type:chore':'chore','type:docs':'docs','type:refactor':'refactor' };
+            const pickedKind = Object.keys(kindMap).find(k => labelNames.includes(k));
+            const kindValue = pickedKind ? kindMap[pickedKind] : null;
+
+            const prioValue = labelPick(['P0','P1','P2']) || null;
+
+            // Status wanted
+            const action = context.payload.action;
+            const merged = context.payload.pull_request?.merged === true;
+            let statusWanted = null;
+            if (inpIssue || inpPR) {
+              statusWanted = 'Inbox'; // manual run defaults to Inbox
+            } else {
+              if (['opened','reopened','ready_for_review','transferred'].includes(action)) statusWanted = 'Inbox';
+              if ((itemType==='issue' && action === 'closed') || (itemType==='pr' && action==='closed' && merged)) statusWanted = 'Done';
+            }
+
+            // Helper to set SingleSelect
+            async function setSingleSelect(field, optionName){
+              if (!field || !optionName) return;
+              const options = field.options || [];
+              let opt = options.find(o => o.name === optionName);
+              if (!opt && field.name === 'Status') {
+                // fallbacks for Status
+                const fallback = optionName === 'Inbox' ? (options.find(o=>/todo/i.test(o.name))?.name) : (options.find(o=>/done/i.test(o.name))?.name);
+                if (fallback) {
+                  opt = options.find(o => o.name === fallback);
+                  core.warning(`Status option "${optionName}" not found. Using "${fallback}"`);
+                }
+              }
+              if (!opt) { core.warning(`Option "${optionName}" not found in field "${field.name}"`); return; }
+              await github.graphql(
+                `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:String!){
+                   updateProjectV2ItemFieldValue(
+                     input:{ projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{ singleSelectOptionId:$optionId } }
+                   ){
+                     projectV2Item { id }
+                   }
+                 }`,
+                { projectId: project.id, itemId, fieldId: field.id, optionId: opt.id }
+              );
+              core.info(`Set ${field.name} = ${opt.name}`);
+            }
+
+            await Promise.all([
+              setSingleSelect(statusField, statusWanted),
+              setSingleSelect(kindField,   kindValue),
+              setSingleSelect(prioField,   prioValue),
+            ]);
+
+            core.notice(`Done. Status=${statusWanted||'-'} Kind=${kindValue||'-'} Priority=${prioValue||'-'}`);
