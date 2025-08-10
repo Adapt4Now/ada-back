@@ -32,9 +32,6 @@ jobs:
             const cmp = await github.rest.repos.compareCommits({ owner, repo, base, head });
             const skip = cmp.data.ahead_by === 0 ? 'true' : 'false';
             core.setOutput('skip', skip);
-            core.notice(skip === 'true'
-              ? 'No differences between master and production.'
-              : `Diff found: master is ahead by ${cmp.data.ahead_by} commit(s).`);
 
       - name: Create or find PR master → production
         if: steps.diff.outputs.skip != 'true'
@@ -47,7 +44,6 @@ jobs:
             const base = 'production';
             const head = 'master';
 
-            // already open?
             const open = await github.rest.pulls.list({ owner, repo, state: 'open', base, head: `${owner}:${head}` });
             if (open.data.length) {
               const pr = open.data[0];
@@ -57,7 +53,6 @@ jobs:
               return;
             }
 
-            // create PR
             const pr = await github.rest.pulls.create({
               owner, repo, title: `Promote ${head} → ${base}`, head, base,
               body: 'Manual promotion. Review the changes and merge after checks are green.'
@@ -67,26 +62,38 @@ jobs:
             core.setOutput('head_sha', pr.data.head.sha);
 
   tests:
-    if: needs.open_pr.outputs.skip != 'true'
+    # Всегда запускаем после open_pr, чтобы чек "Promote to production / tests"
+    # появился на коммите PR даже при отсутствии diff
     needs: open_pr
+    if: always() && needs.open_pr.result == 'success'
     runs-on: ubuntu-latest
     name: tests
     permissions:
       contents: read
+    env:
+      NO_DIFF:  ${{ needs.open_pr.outputs.skip }}
+      HEAD_SHA: ${{ needs.open_pr.outputs.head_sha }}
     steps:
+      - name: No diff — short-circuit
+        if: env.NO_DIFF == 'true'
+        run: echo "No diff; skipping tests but marking check as success."
+
       - name: Checkout PR head
+        if: env.NO_DIFF != 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ needs.open_pr.outputs.head_sha }}
+          ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0
 
       - name: Set up Python
+        if: env.NO_DIFF != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
           cache: 'pip'
 
       - name: Install Poetry
+        if: env.NO_DIFF != 'true'
         uses: snok/install-poetry@v1
         with:
           version: 1.8.3
@@ -94,13 +101,16 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Cache venv
+        if: env.NO_DIFF != 'true'
         uses: actions/cache@v4
         with:
           path: .venv
           key: ${{ runner.os }}-py3.13-poetry-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies (with dev)
+        if: env.NO_DIFF != 'true'
         run: poetry install --with dev --no-interaction
 
       - name: Run tests
-        run: poetry run pytest
+        if: env.NO_DIFF != 'true'
+        run: poetry run pytest -q
