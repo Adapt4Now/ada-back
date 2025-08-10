@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.associations import task_group_association, user_group_membership
 from app.schemas.task import TaskResponseSchema
 
