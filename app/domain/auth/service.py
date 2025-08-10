@@ -41,9 +41,11 @@ class AuthService:
             user_repository = self.user_repository_factory(unit_of_work.session)
             family_repository = self.family_repository_factory(unit_of_work.session)
             new_user = await user_repository.create(user_data)
+            await unit_of_work.session.flush()
             family = await family_repository.create(
                 FamilyCreate(name=f"{new_user.username}'s family", created_by=new_user.id)
             )
+            await unit_of_work.session.flush()
             user = await user_repository.update(
                 new_user.id, UserUpdateSchema(family_id=family.id)
             )

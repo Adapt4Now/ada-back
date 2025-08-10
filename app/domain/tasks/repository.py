@@ -57,6 +57,7 @@ class TaskRepository(BaseRepository[Task]):
         if db_task.status == TaskStatus.COMPLETED:
             db_task.completed_at = datetime.now(UTC)
         self.session.add(db_task)
+        await self.session.flush()
         return self._to_task_details(db_task)
 
     async def get_by_id(self, task_id: int, include_archived: bool = False) -> TaskResponseSchema:
@@ -122,8 +123,6 @@ class TaskRepository(BaseRepository[Task]):
 
         update_data = task_data.model_dump(exclude_unset=True)
 
-        was_completed = task.is_completed
-
         for key, value in update_data.items():
             setattr(task, key, value)
 
@@ -135,10 +134,11 @@ class TaskRepository(BaseRepository[Task]):
             else:
                 task.completed_at = None
 
-        if update_data.get('is_completed') and task.assigned_user_id:
+        if status == TaskStatus.COMPLETED and task.assigned_user_id:
             await AchievementRepository(self.session).check_task_completion_achievements(
                 task.assigned_user_id
             )
+
         return self._to_task_details(task)
 
     async def delete(self, task_id: int) -> None:
