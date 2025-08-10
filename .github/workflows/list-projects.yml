@@ -1,0 +1,72 @@
+name: List Projects V2
+
+on:
+  workflow_dispatch:
+    inputs:
+      owner_type:
+        description: 'org или user'
+        type: choice
+        options: [org, user]
+        default: org
+        required: true
+      login:
+        description: 'Логин организации/пользователя'
+        type: string
+        default: Adapt4Now
+        required: true
+
+permissions:
+  contents: read
+  repository-projects: read
+
+jobs:
+  list:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print Projects
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const ownerType = core.getInput('owner_type');
+            const login = core.getInput('login');
+            const q = ownerType === 'org'
+              ? `query($login:String!){
+                   organization(login:$login){
+                     projectsV2(first:50){
+                       nodes{
+                         title number url closed
+                         fields(first:20){
+                           nodes{
+                             ... on ProjectV2FieldCommon{ name }
+                             ... on ProjectV2SingleSelectField{ name options{ name } }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }`
+              : `query($login:String!){
+                   user(login:$login){
+                     projectsV2(first:50){
+                       nodes{
+                         title number url closed
+                         fields(first:20){
+                           nodes{
+                             ... on ProjectV2FieldCommon{ name }
+                             ... on ProjectV2SingleSelectField{ name options{ name } }
+                           }
+                         }
+                       }
+                     }
+                   }
+                 }`;
+            const res = await github.graphql(q, { login });
+            const nodes = ownerType==='org' ? res.organization.projectsV2.nodes : res.user.projectsV2.nodes;
+            if (!nodes || nodes.length === 0) { core.setFailed('No Projects v2 found'); return; }
+            core.info('Projects V2:');
+            for (const p of nodes) {
+              core.notice(`#${p.number} ${p.title} ${p.closed ? '(closed)' : ''} -> ${p.url}`);
+              const names = (p.fields?.nodes||[]).map(f => f.options ? `${f.name}[${f.options.map(o=>o.name).join(',')}]` : f.name);
+              core.info('  Fields: ' + names.join(' | '));
+            }
