@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -8,24 +8,12 @@ from app.database import Base
 from app.models.group import Group
 from .associations import task_group_association
 
+if TYPE_CHECKING:
+    from app.models.user import User
+
 
 class Task(Base):
-    """
-    Task model representing a task in the system.
-    
-    Attributes:
-        id: Unique task identifier
-        title: Task title
-        description: Detailed task description
-        is_completed: Task completion status
-        priority: Task priority (1-5)
-        created_at: Creation timestamp
-        updated_at: Last update timestamp
-        completed_at: Completion timestamp
-        assigned_user_id: ID of the assigned user
-        assigned_user: Related user object
-        assigned_groups: List of groups the task is assigned to
-    """
+    """Task model representing a task in the system."""
 
     __tablename__ = "tasks"
 
@@ -37,30 +25,45 @@ class Task(Base):
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        nullable=False
+        nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        nullable=False
+        nullable=False,
     )
     completed_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
-        nullable=True
+        nullable=True,
     )
 
     assigned_user_id: Mapped[Optional[int]] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
+        nullable=True,
+    )
+    assigned_by_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
     )
 
-    assigned_user = relationship("User", back_populates="tasks")
+    assigned_user = relationship(
+        "User",
+        back_populates="tasks",
+        foreign_keys=[assigned_user_id],
+    )
+    assigned_by = relationship(
+        "User",
+        back_populates="assigned_tasks",
+        foreign_keys=[assigned_by_user_id],
+    )
     assigned_groups: Mapped[List[Group]] = relationship(
         Group,
         secondary=task_group_association,
         back_populates="tasks",
-        lazy="selectin"
+        lazy="selectin",
     )
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # pragma: no cover - simple repr
         return f"Task(id={self.id}, title='{self.title}', completed={self.is_completed})"
+

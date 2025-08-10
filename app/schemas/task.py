@@ -24,7 +24,12 @@ class TaskBaseSchema(BaseModel):
 
 class TaskCreateSchema(TaskBaseSchema):
     """Schema for creating a new task."""
-    pass
+    assigned_user_id: Optional[int] = Field(
+        ..., gt=0, description="ID of the user to assign; null for unassigned"
+    )
+    assigned_by_user_id: int = Field(
+        ..., gt=0, description="ID of the user who assigns the task"
+    )
 
 
 class TaskUpdateSchema(BaseModel):
@@ -34,6 +39,7 @@ class TaskUpdateSchema(BaseModel):
     priority: Optional[int] = Field(None, ge=1, le=5)
     is_completed: Optional[bool] = None
     assigned_user_id: Optional[int] = Field(None, gt=0)
+    assigned_by_user_id: Optional[int] = Field(None, gt=0)
 
     class Config:
         from_attributes = True
@@ -54,10 +60,22 @@ class TaskResponseSchema(TaskBaseSchema):
         gt=0,
         description="ID of the user assigned to this task"
     )
+    assigned_by_user_id: Optional[int] = Field(
+        None,
+        gt=0,
+        description="ID of the user who assigned this task",
+    )
 
 class TaskAssignGroupsSchema(BaseModel):
     """Schema for assigning task to groups."""
     group_ids: Annotated[List[int], Field(min_length=1)]
+
+    model_config = ConfigDict(frozen=True)
+
+
+class TaskAssignUserSchema(BaseModel):
+    """Schema for assigning a task to a user."""
+    assigned_by_user_id: int = Field(gt=0)
 
     model_config = ConfigDict(frozen=True)
 
