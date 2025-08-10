@@ -36,6 +36,8 @@ async def create_user(db: AsyncSession, user_data: UserCreateSchema) -> User:
         is_active=True,
         is_superuser=user_data.is_superuser,
         is_premium=user_data.is_premium,
+        is_email_verified=user_data.is_email_verified,
+        email_verified_at=user_data.email_verified_at,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
         avatar_url=user_data.avatar_url,
@@ -96,3 +98,18 @@ async def delete_user(db: AsyncSession, user_id: int) -> bool:
     await db.delete(user)
     await db.commit()
     return True
+
+
+async def verify_email(db: AsyncSession, user_id: int) -> Optional[User]:
+    """Mark user's email as verified and set timestamp."""
+    stmt = select(User).where(User.id == bindparam("uid"))
+    result = await db.execute(stmt, {"uid": user_id})
+    user = result.scalar_one_or_none()
+    if user is None:
+        return None
+    user.is_email_verified = True
+    user.email_verified_at = datetime.now(UTC)
+    user.updated_at = datetime.now(UTC)
+    await db.commit()
+    await db.refresh(user)
+    return user

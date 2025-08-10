@@ -28,6 +28,8 @@ class User(Base):
 
     is_superuser = Column(Boolean, nullable=False, server_default=text('false'))
     is_premium = Column(Boolean, nullable=False, server_default=true())
+    is_email_verified = Column(Boolean, nullable=False, server_default=text('false'))
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
     first_name = Column(String(150), nullable=True)
     last_name = Column(String(150), nullable=True)
     avatar_url = Column(String, nullable=True)
