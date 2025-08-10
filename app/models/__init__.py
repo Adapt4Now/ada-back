@@ -1,4 +1,4 @@
-from .user import User
+from .user import User, UserRole
 from .group import Group
 from .family import Family
 from .task import Task
@@ -13,6 +13,7 @@ from .notification import Notification
 
 __all__ = [
     "User",
+    "UserRole",
     "Group",
     "Family",
     "Task",
