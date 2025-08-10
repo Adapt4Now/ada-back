@@ -7,6 +7,7 @@ from .group import GroupResponse
 from .task import TaskResponseSchema
 from .notification import NotificationResponse
 from .setting import SettingResponse
+from app.models.user import UserRole
 
 # Validation constants
 MIN_USERNAME_LENGTH = 3
@@ -42,8 +43,7 @@ class UserCreateSchema(UserSchemaBase):
     avatar_url: Optional[str] = None
     locale: str = Field(default="en-US")
     timezone: str = Field(default="UTC")
-    is_superuser: bool = Field(default=False)
-    is_premium: bool = Field(default=True)
+    role: UserRole = Field(default=UserRole.USER)
     points: int = Field(default=0)
     level: Optional[int] = None
     created_by: Optional[int] = None

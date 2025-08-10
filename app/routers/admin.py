@@ -10,14 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_database_session
 from app.models.user import User
 from app.schemas.user import UserAdminResponseSchema, UserUpdateSchema
-from app.core.security import get_current_superuser
+from app.core.security import get_current_admin
+from app.models.user import UserRole
 from app.crud.user import update_user as crud_update_user
 
 
 router = APIRouter(
     prefix="/admin",
     tags=["admin"],
-    dependencies=[Depends(get_current_superuser)],
+    dependencies=[Depends(get_current_admin)],
 )
 
 
@@ -70,7 +71,7 @@ async def make_user_admin(
     db: AsyncSession = Depends(get_database_session),
 ) -> UserAdminResponseSchema:
     """Grant administrative rights to the specified user."""
-    user = await crud_update_user(db, user_id, UserUpdateSchema(is_superuser=True))
+    user = await crud_update_user(db, user_id, UserUpdateSchema(role=UserRole.ADMIN))
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserAdminResponseSchema.model_validate(user)
