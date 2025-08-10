@@ -35,6 +35,7 @@ class Task(Base):
         default=TaskStatus.PENDING,
     )
     priority: Mapped[int] = mapped_column(Integer, default=1)
+    reward_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -45,6 +46,10 @@ class Task(Base):
         nullable=False,
     )
     completed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    due_date: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )

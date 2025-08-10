@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.task import Task, TaskStatus
 from app.models.group import Group
+from app.models.user import User
 from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
 
 UTC = ZoneInfo("UTC")
@@ -110,6 +111,8 @@ class TaskRepository:
             raise TaskNotFoundError(f"Task with id {task_id} not found")
 
         update_data = task_data.model_dump(exclude_unset=True)
+
+        was_completed = task.is_completed
 
         for key, value in update_data.items():
             setattr(task, key, value)
