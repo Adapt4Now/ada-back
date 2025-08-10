@@ -3,6 +3,8 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from pydantic import ConfigDict
 
+from app.models.task import TaskStatus
+
 
 class TaskBaseSchema(BaseModel):
     """Base task model with main fields."""
@@ -16,6 +18,10 @@ class TaskBaseSchema(BaseModel):
         ge=1,
         le=5,
         description="Task priority from 1 to 5"
+    )
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING,
+        description="Current status of the task",
     )
 
     class Config:
@@ -37,7 +43,7 @@ class TaskUpdateSchema(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=5)
-    is_completed: Optional[bool] = None
+    status: Optional[TaskStatus] = None
     assigned_user_id: Optional[int] = Field(None, gt=0)
     assigned_by_user_id: Optional[int] = Field(None, gt=0)
 
@@ -48,10 +54,6 @@ class TaskUpdateSchema(BaseModel):
 class TaskResponseSchema(TaskBaseSchema):
     """Schema for task response with additional fields."""
     id: int = Field(gt=0, description="Task unique identifier")
-    is_completed: bool = Field(
-        default=False,
-        description="Indicates if the task is completed"
-    )
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None

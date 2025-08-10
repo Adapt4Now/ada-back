@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.group import Group
 from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
 
@@ -49,9 +49,12 @@ class TaskRepository:
         db_task = Task(
             title=task_data.title,
             description=task_data.description,
+            status=task_data.status,
             created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            updated_at=datetime.now(UTC),
         )
+        if db_task.status == TaskStatus.COMPLETED:
+            db_task.completed_at = datetime.now(UTC)
         self.db.add(db_task)
         await self.db.commit()
         await self.db.refresh(db_task)
@@ -112,8 +115,12 @@ class TaskRepository:
             setattr(task, key, value)
 
         task.updated_at = datetime.now(UTC)
-        if update_data.get('is_completed'):
-            task.completed_at = datetime.now(UTC)
+        status = update_data.get('status')
+        if status is not None:
+            if status == TaskStatus.COMPLETED:
+                task.completed_at = datetime.now(UTC)
+            else:
+                task.completed_at = None
 
         await self.db.commit()
         await self.db.refresh(task)

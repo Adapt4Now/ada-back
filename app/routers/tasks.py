@@ -8,7 +8,7 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.group import Group
 from app.schemas.task import (
     TaskCreateSchema,
@@ -61,6 +61,8 @@ async def create_task(
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC)
     )
+    if new_task.status == TaskStatus.COMPLETED:
+        new_task.completed_at = datetime.now(UTC)
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
@@ -115,8 +117,16 @@ async def update_task(
             detail="Task not found"
         )
 
-    for field, value in task_data.model_dump(exclude_unset=True).items():
+    update_data = task_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(task, field, value)
+    task.updated_at = datetime.now(UTC)
+    status = update_data.get("status")
+    if status is not None:
+        if status == TaskStatus.COMPLETED:
+            task.completed_at = datetime.now(UTC)
+        else:
+            task.completed_at = None
 
     await db.commit()
     await db.refresh(task)
