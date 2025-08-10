@@ -1,0 +1,49 @@
+name: Promote to production
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  preprod-tests:
+    uses: ./.github/workflows/preprod-tests.yml
+    with:
+      python-version: '3.13'
+    secrets: inherit
+
+  open-pull-request:
+    needs: preprod-tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Create or find PR master → production
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.MACHINE_USER_TOKEN }}  # PAT of machine user
+          script: |
+            const { owner, repo } = context.repo;
+            const base = 'production';
+            const head = 'master';
+
+            // Check if an open PR already exists
+            const listResp = await github.rest.pulls.list({
+              owner, repo, state: 'open', base, head: `${owner}:${head}`
+            });
+            if (listResp.data.length > 0) {
+              const pr = listResp.data[0];
+              core.notice(`PR already open: #${pr.number}`);
+              core.setOutput('pr_number', pr.number);
+              return;
+            }
+
+            // Create a new PR
+            const createResp = await github.rest.pulls.create({
+              owner, repo,
+              title: `Promote ${head} → ${base}`,
+              head, base,
+              body: 'Manual promotion. Review the changes and merge after checks are green.'
+            });
+            core.notice(`Created PR #${createResp.data.number}`);
+            core.setOutput('pr_number', createResp.data.number);
