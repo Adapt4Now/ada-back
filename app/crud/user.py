@@ -66,7 +66,7 @@ async def get_user(db: AsyncSession, user_id: int) -> User:
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        raise UserNotFoundError(f"User with id {user_id} not found")
+        raise UserNotFoundError
     return user
 
 
@@ -80,7 +80,7 @@ async def update_user(
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        raise UserNotFoundError(f"User with id {user_id} not found")
+        raise UserNotFoundError
 
     update_data = user_update.model_dump(exclude_unset=True)
     if "password" in update_data:
@@ -101,7 +101,7 @@ async def delete_user(db: AsyncSession, user_id: int) -> None:
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        raise UserNotFoundError(f"User with id {user_id} not found")
+        raise UserNotFoundError
     await db.delete(user)
     await db.commit()
 
@@ -114,7 +114,7 @@ async def update_user_status(
     result = await db.execute(stmt, {"uid": user_id})
     user = result.scalar_one_or_none()
     if user is None:
-        raise UserNotFoundError(f"User with id {user_id} not found")
+        raise UserNotFoundError
     user.status = status
     user.updated_at = datetime.now(UTC)
     await db.commit()

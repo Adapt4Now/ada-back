@@ -76,7 +76,7 @@ class TaskRepository:
         result = await self.db.execute(query)
         task = result.scalars().first()
         if task is None:
-            raise TaskNotFoundError(f"Task with id {task_id} not found")
+            raise TaskNotFoundError
         return self._to_task_details(task)
 
     async def get_all(self) -> List[TaskResponseSchema]:
@@ -111,7 +111,7 @@ class TaskRepository:
         task = result.scalars().first()
 
         if not task:
-            raise TaskNotFoundError(f"Task with id {task_id} not found")
+            raise TaskNotFoundError
 
         update_data = task_data.model_dump(exclude_unset=True)
 
@@ -148,7 +148,7 @@ class TaskRepository:
         )
         task = result.scalars().first()
         if not task:
-            raise TaskNotFoundError(f"Task with id {task_id} not found")
+            raise TaskNotFoundError
         task.deleted_at = datetime.now(UTC)
         task.is_archived = True
         await self.db.commit()
@@ -158,7 +158,7 @@ class TaskRepository:
         result = await self.db.execute(select(Task).where(Task.id == task_id))
         task = result.scalars().first()
         if not task or task.deleted_at is None:
-            raise TaskNotFoundError(f"Task with id {task_id} not found or not archived")
+            raise TaskNotFoundError(detail="Task not found or not archived")
         task.deleted_at = None
         task.is_archived = False
         await self.db.commit()
@@ -202,7 +202,7 @@ class TaskRepository:
         task = result.scalars().first()
 
         if not task:
-            raise TaskNotFoundError(f"Task with id {task_id} not found")
+            raise TaskNotFoundError
 
         groups_result = await self.db.execute(
             select(Group).where(Group.id.in_(group_ids))
