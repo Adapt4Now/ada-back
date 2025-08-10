@@ -1,5 +1,5 @@
 from datetime import datetime, UTC
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from app.crud.user import (
 from app.crud.family import create_family
 from app.models.user import User
 from app.core.security import create_access_token, verify_password
+from app.core.exceptions import AppError, UserNotFoundError
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
@@ -45,7 +46,7 @@ async def login(
     db: AsyncSession = Depends(get_database_session),
 ) -> Token:
     if not credentials.username and not credentials.email:
-        raise HTTPException(status_code=400, detail="Username or email required")
+        raise AppError("Username or email required")
 
     query = select(User)
     params = {}
@@ -59,7 +60,7 @@ async def login(
     result = await db.execute(query, params)
     user = result.scalar_one_or_none()
     if user is None or not verify_password(credentials.password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+        raise AppError("Invalid credentials")
 
     await update_user(db, user.id, UserUpdateSchema(last_login_at=datetime.now(UTC)))
     token = create_access_token({"sub": str(user.id)})
@@ -73,7 +74,7 @@ async def request_password_reset(
 ):
     token = await create_reset_token(db, data.email)
     if token is None:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise UserNotFoundError()
     return {"reset_token": token}
 
 
@@ -84,5 +85,5 @@ async def apply_password_reset(
 ):
     success = await reset_password(db, data.token, data.new_password)
     if not success:
-        raise HTTPException(status_code=400, detail="Invalid or expired token")
+        raise AppError("Invalid or expired token")
     return {"message": "Password reset successful"}

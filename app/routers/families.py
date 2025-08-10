@@ -1,12 +1,12 @@
 from typing import List
-from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
 from app.schemas.family import FamilyCreate, FamilyResponse
 from app.crud.family import FamilyRepository
+from app.core.exceptions import FamilyNotFoundError
 
 router = APIRouter(prefix="/families", tags=["families"])
 
@@ -41,5 +41,5 @@ async def get_family(
 ) -> FamilyResponse:
     family = await repo.get(family_id)
     if family is None:
-        raise HTTPException(status_code=404, detail="Family not found")
+        raise FamilyNotFoundError()
     return FamilyResponse.model_validate(family)

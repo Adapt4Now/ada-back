@@ -1,11 +1,12 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
 from app.crud.notification import NotificationRepository
 from app.schemas.notification import NotificationResponse, NotificationCreate
+from app.core.exceptions import NotificationNotFoundError
 
 router = APIRouter()
 
@@ -51,7 +52,7 @@ async def mark_notification_as_read(
 ):
     notification = await repo.mark_as_read(notification_id)
     if notification is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        raise NotificationNotFoundError()
     return NotificationResponse.model_validate(notification)
 
 
@@ -65,4 +66,4 @@ async def delete_notification(
 ):
     success = await repo.delete(notification_id)
     if not success:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+        raise NotificationNotFoundError()

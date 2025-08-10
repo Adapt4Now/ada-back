@@ -34,3 +34,21 @@ class UserNotFoundError(NotFoundError):
 
     detail = "User not found"
 
+
+class GroupNotFoundError(NotFoundError):
+    """Raised when a group is not found in the database."""
+
+    detail = "Group not found"
+
+
+class NotificationNotFoundError(NotFoundError):
+    """Raised when a notification is not found."""
+
+    detail = "Notification not found"
+
+
+class FamilyNotFoundError(NotFoundError):
+    """Raised when a family is not found in the database."""
+
+    detail = "Family not found"
+
