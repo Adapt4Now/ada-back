@@ -8,8 +8,9 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.group import Group
+from app.models.user import User
 from app.schemas.task import (
     TaskCreateSchema,
     TaskResponseSchema,
@@ -32,12 +33,15 @@ UTC = ZoneInfo("UTC")
     summary="Get all tasks"
 )
 async def get_tasks(
+        include_archived: bool = False,
         db: AsyncSession = Depends(get_database_session)
 ) -> List[TaskResponseSchema]:
     """
     Retrieve all tasks from the system.
     """
     query = select(Task)
+    if not include_archived:
+        query = query.where(Task.deleted_at.is_(None))
     result = await db.execute(query)
     tasks = result.scalars().all()
     return [TaskResponseSchema.model_validate(task) for task in tasks]
@@ -66,6 +70,8 @@ async def create_task(
         created_at=datetime.now(UTC),
         updated_at=datetime.now(UTC),
     )
+    if new_task.status == TaskStatus.COMPLETED:
+        new_task.completed_at = datetime.now(UTC)
     db.add(new_task)
     await db.commit()
     await db.refresh(new_task)
@@ -79,12 +85,15 @@ async def create_task(
 )
 async def get_task_by_id(
         task_id: int,
+        include_archived: bool = False,
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """
     Get detailed information about a specific task.
     """
     query = select(Task).where(Task.id == task_id)
+    if not include_archived:
+        query = query.where(Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -111,6 +120,7 @@ async def update_task(
     Update task information.
     """
     query = select(Task).where(Task.id == task_id)
+    query = query.where(Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -120,8 +130,24 @@ async def update_task(
             detail="Task not found"
         )
 
-    for field, value in task_data.model_dump(exclude_unset=True).items():
+    update_data = task_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(task, field, value)
+    task.updated_at = datetime.now(UTC)
+    status = update_data.get("status")
+    if status is not None:
+        if status == TaskStatus.COMPLETED:
+            task.completed_at = datetime.now(UTC)
+        else:
+            task.completed_at = None
+
+    if update_data.get('is_completed') is not None and update_data['is_completed'] and not was_completed:
+        if task.assigned_user_id is not None:
+            user_result = await db.execute(select(User).where(User.id == task.assigned_user_id))
+            user = user_result.scalar_one_or_none()
+            if user:
+                user.points += task.reward_points
+
 
     await db.commit()
     await db.refresh(task)
@@ -140,7 +166,7 @@ async def delete_task(
     """
     Delete a task from the system.
     """
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -150,7 +176,8 @@ async def delete_task(
             detail="Task not found"
         )
 
-    await db.delete(task)
+    task.deleted_at = datetime.now(UTC)
+    task.is_archived = True
     await db.commit()
 
 
@@ -166,7 +193,7 @@ async def assign_task_to_user(
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """Assign a task to a specific user."""
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -196,7 +223,7 @@ async def unassign_task_from_user(
     """
     Remove the task assignment from a specific user.
     """
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -230,7 +257,7 @@ async def assign_task_to_groups(
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """Assign a task to multiple groups."""
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -268,7 +295,7 @@ async def unassign_task_from_group(
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
     """Remove the task assignment from a specific group."""
-    query = select(Task).where(Task.id == task_id)
+    query = select(Task).where(Task.id == task_id, Task.deleted_at.is_(None))
     result = await db.execute(query)
     task = result.scalar_one_or_none()
 
@@ -289,6 +316,37 @@ async def unassign_task_from_group(
         )
 
     task.assigned_groups.remove(group)
+    await db.commit()
+    await db.refresh(task)
+    return TaskResponseSchema.model_validate(task)
+
+
+@router.post(
+    "/{task_id}/restore",
+    response_model=TaskResponseSchema,
+    summary="Restore archived task",
+)
+async def restore_task(
+        task_id: int,
+        db: AsyncSession = Depends(get_database_session)
+) -> TaskResponseSchema:
+    """Restore a previously archived task."""
+    query = select(Task).where(Task.id == task_id)
+    result = await db.execute(query)
+    task = result.scalar_one_or_none()
+
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    if task.deleted_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Task is not archived",
+        )
+    task.deleted_at = None
+    task.is_archived = False
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)

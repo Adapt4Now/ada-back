@@ -1,7 +1,10 @@
 from typing import List, Optional, Annotated
 from datetime import datetime
-from pydantic import BaseModel, Field
+from zoneinfo import ZoneInfo
+from pydantic import BaseModel, Field, field_validator
 from pydantic import ConfigDict
+
+from app.models.task import TaskStatus
 
 
 class TaskBaseSchema(BaseModel):
@@ -9,17 +12,40 @@ class TaskBaseSchema(BaseModel):
     title: str = Field(min_length=1, max_length=255, description="Task title")
     description: Optional[str] = Field(
         default=None,
-        description="Optional task description"
+        description="Optional task description",
     )
     priority: int = Field(
         default=1,
         ge=1,
         le=5,
-        description="Task priority from 1 to 5"
+        description="Task priority from 1 to 5",
+    )
+    due_date: Optional[datetime] = Field(
+        default=None,
+        description="Optional deadline for completing the task",
+    )
+    reward_points: int = Field(
+        default=0,
+        ge=0,
+        description="Reward points for completing the task"
+    )
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING,
+        description="Current status of the task",
     )
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    @field_validator("due_date")
+    def validate_due_date(cls, value: Optional[datetime]) -> Optional[datetime]:
+        if value is not None:
+            if value.tzinfo is None:
+                raise ValueError("due_date must include timezone information")
+            if value < datetime.now(UTC):
+                raise ValueError("due_date cannot be in the past")
+        return value
 
 
 class TaskCreateSchema(TaskBaseSchema):
@@ -46,7 +72,7 @@ class TaskUpdateSchema(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=5)
-    is_completed: Optional[bool] = None
+    status: Optional[TaskStatus] = None
     assigned_user_id: Optional[int] = Field(None, gt=0)
     assigned_by_user_id: Optional[int] = Field(None, gt=0)
     created_by_user_id: Optional[int] = Field(None, gt=0)
@@ -54,21 +80,32 @@ class TaskUpdateSchema(BaseModel):
     class Config:
         from_attributes = True
 
+    @classmethod
+    @field_validator("due_date")
+    def validate_due_date(cls, value: Optional[datetime]) -> Optional[datetime]:
+        if value is not None:
+            if value.tzinfo is None:
+                raise ValueError("due_date must include timezone information")
+            if value < datetime.now(UTC):
+                raise ValueError("due_date cannot be in the past")
+        return value
+
 
 class TaskResponseSchema(TaskBaseSchema):
     """Schema for task response with additional fields."""
     id: int = Field(gt=0, description="Task unique identifier")
-    is_completed: bool = Field(
-        default=False,
-        description="Indicates if the task is completed"
-    )
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None
+    deleted_at: Optional[datetime] = None
+    is_archived: bool = Field(
+        default=False,
+        description="Indicates if the task is archived",
+    )
     assigned_user_id: Optional[int] = Field(
         None,
         gt=0,
-        description="ID of the user assigned to this task"
+        description="ID of the user assigned to this task",
     )
     assigned_by_user_id: Optional[int] = Field(
         None,
@@ -79,6 +116,7 @@ class TaskResponseSchema(TaskBaseSchema):
         gt=0,
         description="ID of the user who created this task",
     )
+
 
 class TaskAssignGroupsSchema(BaseModel):
     """Schema for assigning task to groups."""
