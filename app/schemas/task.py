@@ -1,10 +1,13 @@
-from typing import List, Optional, Annotated
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from typing import Annotated, List, Optional
+
 from pydantic import BaseModel, Field, field_validator
 from pydantic import ConfigDict
 
 from app.models.task import TaskStatus
+
+UTC = ZoneInfo("UTC")
 
 
 class TaskBaseSchema(BaseModel):
@@ -67,6 +70,7 @@ class TaskUpdateSchema(BaseModel):
     assigned_user_id: Optional[int] = Field(None, gt=0)
     assigned_by_user_id: Optional[int] = Field(None, gt=0)
     reward_points: Optional[int] = Field(None, ge=0)
+    due_date: Optional[datetime] = None
 
     class Config:
         from_attributes = True

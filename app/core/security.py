@@ -11,7 +11,7 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.user import User, UserStatus
+from app.models.user import User, UserStatus, UserRole
 
 SECRET_KEY = os.getenv("SECRET_KEY", "secret")
 ALGORITHM = "HS256"

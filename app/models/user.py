@@ -1,6 +1,4 @@
 
-from enum import Enum
-
 from sqlalchemy import (
     Boolean,
     Column,
@@ -34,6 +32,11 @@ class UserStatus(str, enum.Enum):
     BANNED = "BANNED"
 
 
+class UserRole(str, enum.Enum):
+    USER = "USER"
+    ADMIN = "ADMIN"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -48,6 +51,11 @@ class User(Base):
         SQLEnum(UserStatus, name="userstatus"),
         nullable=False,
         server_default="ACTIVE",
+    )
+    role = Column(
+        SQLEnum(UserRole, name="userrole"),
+        nullable=False,
+        server_default="USER",
     )
 
     is_superuser = Column(Boolean, nullable=False, server_default=text('false'))

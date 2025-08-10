@@ -127,26 +127,26 @@ async def update_task(
         )
 
     update_fields = task_data.model_dump(exclude_unset=True)
+    was_completed = task.status == TaskStatus.COMPLETED
+
+    new_status = update_fields.get("status")
     for field, value in update_fields.items():
         setattr(task, field, value)
     task.updated_at = datetime.now(UTC)
-    status = update_data.get("status")
-    if status is not None:
-        if status == TaskStatus.COMPLETED:
+
+    if new_status is not None:
+        if new_status == TaskStatus.COMPLETED:
             task.completed_at = datetime.now(UTC)
+            if not was_completed and task.assigned_user_id is not None:
+                user_result = await db.execute(select(User).where(User.id == task.assigned_user_id))
+                user = user_result.scalar_one_or_none()
+                if user:
+                    user.points += task.reward_points
         else:
             task.completed_at = None
 
-    if update_data.get('is_completed') is not None and update_data['is_completed'] and not was_completed:
-        if task.assigned_user_id is not None:
-            user_result = await db.execute(select(User).where(User.id == task.assigned_user_id))
-            user = user_result.scalar_one_or_none()
-            if user:
-                user.points += task.reward_points
-
-
     await db.commit()
-    if update_fields.get("is_completed") and task.assigned_user_id:
+    if new_status == TaskStatus.COMPLETED and task.assigned_user_id:
         await check_task_completion_achievements(db, task.assigned_user_id)
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
