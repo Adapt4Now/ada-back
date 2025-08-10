@@ -17,20 +17,22 @@ class FamilyRepository:
     async def create(self, family: FamilyCreate) -> Family:
         db_family = Family(name=family.name, created_by=family.created_by)
         self.session.add(db_family)
+        await self.session.flush()
 
         default_group = Group(
             name="general",
             description="Default group",
             created_by="system",
-            family_id=db_family.id,
+            family=db_family,
         )
         self.session.add(default_group)
+        await self.session.flush()
 
         self.session.add(
-            GroupMembership(user_id=family.created_by, group_id=default_group.id, role="owner")
+            GroupMembership(user_id=family.created_by, group=default_group, role="owner")
         )
         self.session.add(
-            FamilyMembership(user_id=family.created_by, family_id=db_family.id, role="owner")
+            FamilyMembership(user_id=family.created_by, family=db_family, role="owner")
         )
 
         return db_family
