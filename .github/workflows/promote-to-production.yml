@@ -20,24 +20,15 @@ jobs:
     needs: preprod-tests
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write        # need write to read/compare/create PR metadata
       pull-requests: write
       actions: read
-    env:
-      MACHINE_TOKEN: ${{ secrets.MACHINE_USER_TOKEN }}  # must be set in repo secrets
     steps:
-      - name: Assert machine token is present
-        run: |
-          if [ -z "${MACHINE_TOKEN}" ]; then
-            echo "MACHINE_USER_TOKEN is missing in repository secrets." >&2
-            exit 1
-          fi
-
       - name: Diff master vs production
         id: diff
         uses: actions/github-script@v7
         with:
-          github-token: ${{ env.MACHINE_TOKEN }}
+          github-token: ${{ github.token }}   # <-- no secret needed
           script: |
             const { owner, repo } = context.repo;
             const base = 'production';
@@ -51,32 +42,41 @@ jobs:
 
       - name: Create or find PR master → production
         if: steps.diff.outputs.skip != 'true'
-        id: create_pr
         uses: actions/github-script@v7
         with:
-          github-token: ${{ env.MACHINE_TOKEN }}
+          github-token: ${{ github.token }}   # <-- no secret needed
           script: |
             const { owner, repo } = context.repo;
             const base = 'production';
             const head = 'master';
 
-            // Check if an open PR already exists
-            const listResp = await github.rest.pulls.list({
-              owner, repo, state: 'open', base, head: `${owner}:${head}`
-            });
-            if (listResp.data.length > 0) {
-              const pr = listResp.data[0];
-              core.notice(`PR already open: #${pr.number}`);
-              core.setOutput('pr_number', pr.number.toString());
-              return;
-            }
+            try {
+              const listResp = await github.rest.pulls.list({
+                owner, repo, state: 'open', base, head: `${owner}:${head}`
+              });
+              if (listResp.data.length > 0) {
+                const pr = listResp.data[0];
+                core.notice(`PR already open: #${pr.number}`);
+                core.setOutput('pr_number', pr.number.toString());
+                return;
+              }
 
-            // Create a new PR
-            const createResp = await github.rest.pulls.create({
-              owner, repo,
-              title: `Promote ${head} → ${base}`,
-              head, base,
-              body: 'Manual promotion. Review the changes and merge after checks are green.'
-            });
-            core.notice(`Created PR #${createResp.data.number}`);
-            core.setOutput('pr_number', createResp.data.number.toString());
+              const createResp = await github.rest.pulls.create({
+                owner, repo,
+                title: `Promote ${head} → ${base}`,
+                head, base,
+                body: 'Manual promotion. Review the changes and merge after checks are green.'
+              });
+              core.notice(`Created PR #${createResp.data.number}`);
+              core.setOutput('pr_number', createResp.data.number.toString());
+            } catch (e) {
+              if (e.status === 403) {
+                core.setFailed(
+                  "403: Creating PRs with GITHUB_TOKEN is blocked by repo/org settings. " +
+                  "Either enable 'Allow GitHub Actions to create and approve pull requests' " +
+                  "or switch to the PAT-based workflow."
+                );
+                return;
+              }
+              throw e;
+            }
