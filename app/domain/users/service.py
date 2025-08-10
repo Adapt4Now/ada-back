@@ -23,7 +23,6 @@ class UserService:
         async with self.uow as uow:
             repo = UserRepository(uow.session)
             new_user = await repo.create(user_data)
-            await uow.commit()
         logger.info("Created user %s", new_user.id)
         return UserResponseSchema.model_validate(new_user)
 
@@ -43,7 +42,6 @@ class UserService:
         async with self.uow as uow:
             repo = UserRepository(uow.session)
             await repo.delete(user_id)
-            await uow.commit()
         logger.info("Deleted user %s", user_id)
 
     async def update_user(
@@ -52,7 +50,6 @@ class UserService:
         async with self.uow as uow:
             repo = UserRepository(uow.session)
             user = await repo.update(user_id, user_data)
-            await uow.commit()
         return UserResponseSchema.model_validate(user)
 
     async def update_status(
@@ -61,5 +58,4 @@ class UserService:
         async with self.uow as uow:
             repo = UserRepository(uow.session)
             user = await repo.update_status(user_id, status)
-            await uow.commit()
         return UserResponseSchema.model_validate(user)

@@ -104,17 +104,22 @@ Base = declarative_base()
 class UnitOfWork:
     """Unit of work for managing database transactions."""
 
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]):
+    def __init__(
+        self, session_factory: async_sessionmaker[AsyncSession], *, auto_commit: bool = True
+    ):
         self._session_factory = session_factory
         self.session: AsyncSession | None = None
+        self._auto_commit = auto_commit
 
     async def __aenter__(self) -> "UnitOfWork":
         self.session = self._session_factory()
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
-        if exc is not None and self.session is not None:
+        if exc_type is not None and self.session is not None:
             await self.session.rollback()
+        elif self._auto_commit and self.session is not None:
+            await self.session.commit()
         if self.session is not None:
             await self.session.close()
             self.session = None

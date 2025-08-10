@@ -40,7 +40,6 @@ class AuthService:
             user = await user_repo.update(
                 new_user.id, UserUpdateSchema(family_id=family.id)
             )
-            await uow.commit()
         logger.info("Registered user %s", new_user.id)
         return UserResponseSchema.model_validate(user)
 
@@ -58,7 +57,6 @@ class AuthService:
             await user_repo.update(
                 user.id, UserUpdateSchema(last_login_at=datetime.now(UTC))
             )
-            await uow.commit()
         token = create_access_token({"sub": str(user.id)})
         logger.info("User %s logged in", user.id)
         return Token(access_token=token)
@@ -69,7 +67,6 @@ class AuthService:
             token = await user_repo.create_reset_token(data.email)
             if token is None:
                 raise UserNotFoundError()
-            await uow.commit()
         logger.info("Password reset requested for %s", data.email)
         return {"reset_token": token}
 
@@ -79,6 +76,5 @@ class AuthService:
             success = await user_repo.reset_password(data.token, data.new_password)
             if not success:
                 raise AppError("Invalid or expired token")
-            await uow.commit()
         logger.info("Password reset applied")
         return {"message": "Password reset successful"}

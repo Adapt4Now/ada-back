@@ -16,7 +16,6 @@ class FamilyService:
         async with self.uow as uow:
             repo = FamilyRepository(uow.session)
             family = await repo.create(data)
-            await uow.commit()
         return FamilyResponse.model_validate(family)
 
     async def list_families(self) -> List[FamilyResponse]:

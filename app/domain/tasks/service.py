@@ -30,7 +30,6 @@ class TaskService:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             task = await repo.create(task_data)
-            await uow.commit()
         return task
 
     async def get_task_by_id(
@@ -47,14 +46,12 @@ class TaskService:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             task = await repo.update(task_id, task_data)
-            await uow.commit()
         return task
 
     async def delete_task(self, task_id: int) -> None:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             await repo.delete(task_id)
-            await uow.commit()
 
     async def assign_task_to_user(
         self, task_id: int, user_id: int, assignment: TaskAssignUserSchema
@@ -64,7 +61,6 @@ class TaskService:
             task = await repo.assign_to_user(
                 task_id, user_id, assignment.assigned_by_user_id
             )
-            await uow.commit()
         return task
 
     async def unassign_task_from_user(
@@ -73,7 +69,6 @@ class TaskService:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             task = await repo.unassign_from_user(task_id, user_id)
-            await uow.commit()
         return task
 
     async def assign_task_to_groups(
@@ -82,7 +77,6 @@ class TaskService:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             task = await repo.assign_to_groups(task_id, list(assignment.group_ids))
-            await uow.commit()
         return task
 
     async def unassign_task_from_group(
@@ -91,12 +85,10 @@ class TaskService:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             task = await repo.unassign_from_group(task_id, group_id)
-            await uow.commit()
         return task
 
     async def restore_task(self, task_id: int) -> TaskResponseSchema:
         async with self.uow as uow:
             repo = TaskRepository(uow.session)
             task = await repo.restore(task_id)
-            await uow.commit()
         return task
