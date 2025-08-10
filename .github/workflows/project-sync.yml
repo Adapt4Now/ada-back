@@ -1,0 +1,173 @@
+name: Project sync (auto)
+
+on:
+  issues:
+    types: [opened, reopened, edited, labeled, unlabeled, closed, transferred]
+  pull_request:
+    types: [opened, reopened, ready_for_review, labeled, unlabeled, edited, closed]
+  # Ручной запуск оставляю, но без инпутов — чисто для дебага
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+  repository-projects: write
+
+concurrency:
+  group: project-sync-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  # Поставь точное имя твоего проекта в Projects v2 (как в шапке проекта).
+  # Если оставишь "Ada Backlog", но у тебя другое имя — экшен попытается
+  # найти открытый проект со словами Ada/Backlog, иначе возьмёт первый открытый.
+  PROJECT_TITLE: "Ada Backlog"
+  # (опционально) можно задать прямой URL Projects v2, тогда имя игнорируется:
+  # PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/NN"
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync to Project (no inputs)
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const titlePref = (process.env.PROJECT_TITLE || '').trim();
+            const urlPref   = (process.env.PROJECT_URL || '').trim();
+            const ownerLogin = context.repo.owner; // Adapt4Now
+            const repo = context.repo.repo;
+
+            // 1) Определяем: org или user + тянем проекты
+            const qOrg = `query($login:String!){
+              organization(login:$login){
+                projectsV2(first:50){
+                  nodes{ id title number url closed
+                    fields(first:50){
+                      nodes{
+                        ... on ProjectV2FieldCommon{ id name dataType }
+                        ... on ProjectV2SingleSelectField{ id name dataType options{ id name } }
+                      }
+                    }
+                  }
+                }
+              }
+            }`;
+            const qUser = `query($login:String!){
+              user(login:$login){
+                projectsV2(first:50){
+                  nodes{ id title number url closed
+                    fields(first:50){
+                      nodes{
+                        ... on ProjectV2FieldCommon{ id name dataType }
+                        ... on ProjectV2SingleSelectField{ id name dataType options{ id name } }
+                      }
+                    }
+                  }
+                }
+              }
+            }`;
+
+            let nodes = [];
+            let ownerIsOrg = false;
+            try {
+              const r = await github.graphql(qOrg, { login: ownerLogin });
+              nodes = r.organization?.projectsV2?.nodes || [];
+              ownerIsOrg = !!nodes.length;
+            } catch(e) { /* ignore */ }
+            if (!nodes.length) {
+              const r = await github.graphql(qUser, { login: ownerLogin });
+              nodes = r.user?.projectsV2?.nodes || [];
+              ownerIsOrg = false;
+            }
+            if (!nodes.length) core.setFailed(`Projects v2 не найдены у "${ownerLogin}"`);
+
+            // 2) Выбираем проект: URL > TITLE > эвристика > первый открытый
+            let project = null;
+            if (urlPref) {
+              const mOrg  = urlPref.match(/orgs\/([^/]+)\/projects\/(\d+)/);
+              const mUser = urlPref.match(/users\/([^/]+)\/projects\/(\d+)/);
+              if (!mOrg && !mUser) core.setFailed(`Bad PROJECT_URL: ${urlPref}`);
+              const wanted = parseInt((mOrg || mUser)[2], 10);
+              project = nodes.find(p => p.number === wanted);
+            }
+            if (!project && titlePref) {
+              project = nodes.find(p => p.title === titlePref)
+                     || nodes.find(p => p.title.toLowerCase() === titlePref.toLowerCase())
+                     || nodes.find(p => !p.closed && p.title.toLowerCase().includes(titlePref.toLowerCase()));
+            }
+            if (!project) {
+              project = nodes.find(p => !p.closed && (/ada|backlog/.test(p.title.toLowerCase())))
+                     || nodes.find(p => !p.closed)
+                     || nodes[0];
+            }
+            core.info(`Project: ${project.title} (#${project.number}) ${project.url}`);
+
+            const fields = project.fields.nodes || [];
+            const f = n => fields.find(x => x.name === n);
+            const statusField = f('Status');
+            const kindField   = f('Kind');      // Твои кастомные
+            const prioField   = f('Priority');  // Твои кастомные
+            if (!statusField) core.setFailed('В проекте нет поля "Status". Добавь его (default) и опции вроде Inbox/Done.');
+
+            // 3) Определяем item (issue/PR) из события
+            const ev = context.payload;
+            const isIssue = !!ev.issue;
+            const isPR = !!ev.pull_request;
+            if (!isIssue && !isPR) { core.notice('Нет issue/PR в событии — выходим'); return; }
+            const nodeId = isIssue ? ev.issue.node_id : ev.pull_request.node_id;
+            const labels = (isIssue ? ev.issue.labels : ev.pull_request.labels) || [];
+            const labelNames = labels.map(l => l.name);
+
+            // 4) Добавляем item (идемпотентно)
+            const addRes = await github.graphql(
+              `mutation($projectId:ID!,$contentId:ID!){
+                 addProjectV2ItemById(input:{projectId:$projectId, contentId:$contentId}){ item{ id } }
+               }`,
+              { projectId: project.id, contentId: nodeId }
+            );
+            const itemId = addRes.addProjectV2ItemById.item.id;
+            core.info(`Item in project: ${itemId}`);
+
+            // 5) Вычисляем значения полей
+            const action = context.payload.action;
+            const merged = ev.pull_request?.merged === true;
+            let statusWanted = null;
+            if (['opened','reopened','ready_for_review','transferred','labeled','unlabeled','edited'].includes(action)) statusWanted = 'Inbox';
+            if ((isIssue && action === 'closed') || (isPR && action === 'closed' && merged)) statusWanted = 'Done';
+
+            const kindMap = { 'type:feature':'feature','type:bug':'bug','type:chore':'chore','type:docs':'docs','type:refactor':'refactor' };
+            const pickedKindKey = Object.keys(kindMap).find(k => labelNames.includes(k));
+            const kindValue = pickedKindKey ? kindMap[pickedKindKey] : null;
+            const prioValue = ['P0','P1','P2'].find(p => labelNames.includes(p)) || null;
+
+            // 6) Установка single-select (с фоллбэками по названию)
+            async function setSingleSelect(field, desired){
+              if (!field || !desired) return;
+              const opts = field.options || [];
+              let opt = opts.find(o => o.name === desired);
+              if (!opt && field.name === 'Status') {
+                if (/inbox/i.test(desired)) opt = opts.find(o => /to *do|backlog|todo/i.test(o.name));
+                if (/done/i.test(desired))  opt = opts.find(o => /done/i.test(o.name));
+              }
+              if (!opt) { core.warning(`Option "${desired}" не найдена в "${field.name}"`); return; }
+              await github.graphql(
+                `mutation($projectId:ID!, $itemId:ID!, $fieldId:ID!, $optionId:String!){
+                   updateProjectV2ItemFieldValue(
+                     input:{ projectId:$projectId, itemId:$itemId, fieldId:$fieldId, value:{ singleSelectOptionId:$optionId } }
+                   ){ projectV2Item { id } }
+                 }`,
+                { projectId: project.id, itemId, fieldId: field.id, optionId: opt.id }
+              );
+              core.info(`Set ${field.name} = ${opt.name}`);
+            }
+
+            await Promise.all([
+              setSingleSelect(statusField, statusWanted || 'Inbox'),
+              setSingleSelect(kindField,   kindValue),
+              setSingleSelect(prioField,   prioValue),
+            ]);
+
+            core.notice(`Done. Status=${statusWanted||'Inbox'} Kind=${kindValue||'-'} Priority=${prioValue||'-'}`);
