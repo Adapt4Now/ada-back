@@ -3,11 +3,11 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 from .models import UserRole, UserStatus
-from app.schemas.family import FamilyResponse
-from app.schemas.group import GroupResponse
+from app.domain.families.schemas import FamilyResponse
+from app.domain.groups.schemas import GroupResponse
 from app.domain.tasks.schemas import TaskResponseSchema
-from app.schemas.notification import NotificationResponse
-from app.schemas.setting import SettingResponse
+from app.domain.notifications.schemas import NotificationResponse
+from app.domain.settings.schemas import SettingResponse
 
 # Validation constants
 MIN_USERNAME_LENGTH = 3

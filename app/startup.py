@@ -5,22 +5,20 @@ from sqlalchemy import select, bindparam
 from starlette.middleware.cors import CORSMiddleware
 import logging
 from app.core.logging import setup_logging
-from app.routers import (
-    auth,
-    tasks,
-    users,
-    groups,
-    families,
-    reports,
-    notifications,
-    settings,
-    admin,
-)
+from app.domain.auth import router as auth
+from app.domain.tasks import router as tasks
+from app.domain.users import router as users
+from app.domain.groups import router as groups
+from app.domain.families import router as families
+from app.domain.reports import router as reports
+from app.domain.notifications import router as notifications
+from app.domain.settings import router as settings
+from app.domain.admin import router as admin
 from app.database import DatabaseConfig, DatabaseSessionManager, create_db_manager
 from app.domain.users.models import User, UserRole
 from app.domain.users.schemas import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
-from app.crud.user import UserRepository
+from app.domain.users.repository import UserRepository
 from app.core.error_handlers import (
     exception_handler,
     http_exception_handler,

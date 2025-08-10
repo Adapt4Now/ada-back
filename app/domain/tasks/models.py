@@ -6,8 +6,8 @@ from sqlalchemy import Boolean, DateTime, Enum as SqlEnum, ForeignKey, Integer, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.group import Group
-from app.models.associations import task_group_association
+from app.domain.groups.models import Group
+from app.domain.groups.associations import task_group_association
 
 if TYPE_CHECKING:
     from app.domain.users.models import User
