@@ -16,6 +16,20 @@ class AppError(Exception):
         super().__init__(self.detail)
 
 
+class AuthenticationError(AppError):
+    """Raised when authentication fails."""
+
+    status_code = 401
+    detail = "Authentication failed"
+
+
+class AuthorizationError(AppError):
+    """Raised when a user lacks necessary permissions."""
+
+    status_code = 403
+    detail = "Not authorized"
+
+
 class NotFoundError(AppError):
     """Raised when a requested entity does not exist."""
 
