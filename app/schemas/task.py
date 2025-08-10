@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 from pydantic import BaseModel, Field, field_validator
 from pydantic import ConfigDict
 
-UTC = ZoneInfo("UTC")
+from app.models.task import TaskStatus
 
 
 class TaskBaseSchema(BaseModel):
@@ -28,6 +28,10 @@ class TaskBaseSchema(BaseModel):
         default=0,
         ge=0,
         description="Reward points for completing the task"
+    )
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING,
+        description="Current status of the task",
     )
 
     class Config:
@@ -59,7 +63,7 @@ class TaskUpdateSchema(BaseModel):
     title: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     priority: Optional[int] = Field(None, ge=1, le=5)
-    is_completed: Optional[bool] = None
+    status: Optional[TaskStatus] = None
     assigned_user_id: Optional[int] = Field(None, gt=0)
     assigned_by_user_id: Optional[int] = Field(None, gt=0)
     reward_points: Optional[int] = Field(None, ge=0)
@@ -81,10 +85,6 @@ class TaskUpdateSchema(BaseModel):
 class TaskResponseSchema(TaskBaseSchema):
     """Schema for task response with additional fields."""
     id: int = Field(gt=0, description="Task unique identifier")
-    is_completed: bool = Field(
-        default=False,
-        description="Indicates if the task is completed",
-    )
     created_at: datetime
     updated_at: datetime
     completed_at: Optional[datetime] = None

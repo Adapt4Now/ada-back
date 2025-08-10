@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.group import Group
 from app.models.user import User
 from app.schemas.task import TaskCreateSchema, TaskResponseSchema, TaskUpdateSchema
@@ -50,12 +50,12 @@ class TaskRepository:
         db_task = Task(
             title=task_data.title,
             description=task_data.description,
-            reward_points=task_data.reward_points,
-            priority=task_data.priority,
-            due_date=task_data.due_date,
+            status=task_data.status,
             created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC)
+            updated_at=datetime.now(UTC),
         )
+        if db_task.status == TaskStatus.COMPLETED:
+            db_task.completed_at = datetime.now(UTC)
         self.db.add(db_task)
         await self.db.commit()
         await self.db.refresh(db_task)
@@ -118,16 +118,10 @@ class TaskRepository:
             setattr(task, key, value)
 
         task.updated_at = datetime.now(UTC)
-        if update_data.get('is_completed') is not None:
-            if update_data['is_completed']:
+        status = update_data.get('status')
+        if status is not None:
+            if status == TaskStatus.COMPLETED:
                 task.completed_at = datetime.now(UTC)
-                if not was_completed and task.assigned_user_id is not None:
-                    user_result = await self.db.execute(
-                        select(User).where(User.id == task.assigned_user_id)
-                    )
-                    user = user_result.scalars().first()
-                    if user:
-                        user.points += task.reward_points
             else:
                 task.completed_at = None
 

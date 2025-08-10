@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.task import Task
+from app.models.task import Task, TaskStatus
 from app.models.associations import task_group_association, user_group_membership
 from app.schemas.task import TaskResponseSchema
 
@@ -17,7 +17,7 @@ async def get_task_summary(db: AsyncSession = Depends(get_database_session)):
     total_result = await db.execute(select(func.count()).select_from(Task))
     total = total_result.scalar_one()
     completed_result = await db.execute(
-        select(func.count()).select_from(Task).where(Task.is_completed.is_(True))
+        select(func.count()).select_from(Task).where(Task.status == TaskStatus.COMPLETED)
     )
     completed = completed_result.scalar_one()
     return {"total_tasks": total, "completed_tasks": completed}
