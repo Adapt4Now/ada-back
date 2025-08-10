@@ -1,0 +1,29 @@
+name: Bug
+description: Report a problem
+title: "fix: "
+labels: ["type:bug","P0"]
+body:
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: dev / prod / local
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: 1) ... 2) ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screens / Context
