@@ -27,7 +27,7 @@ permissions:
   projects: write
 
 env:
-  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1"
+  PROJECT_URL: "https://github.com/orgs/Adapt4Now/projects/1" 
 
 jobs:
   sync:
