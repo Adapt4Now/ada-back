@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_database_session
 from app.models.task import Task
 from app.models.group import Group
+from app.models.user import User
 from app.schemas.task import (
     TaskCreateSchema,
     TaskResponseSchema,
@@ -115,8 +116,18 @@ async def update_task(
             detail="Task not found"
         )
 
-    for field, value in task_data.model_dump(exclude_unset=True).items():
+    update_data = task_data.model_dump(exclude_unset=True)
+    was_completed = task.is_completed
+
+    for field, value in update_data.items():
         setattr(task, field, value)
+
+    if update_data.get('is_completed') is not None and update_data['is_completed'] and not was_completed:
+        if task.assigned_user_id is not None:
+            user_result = await db.execute(select(User).where(User.id == task.assigned_user_id))
+            user = user_result.scalar_one_or_none()
+            if user:
+                user.points += task.reward_points
 
     await db.commit()
     await db.refresh(task)
