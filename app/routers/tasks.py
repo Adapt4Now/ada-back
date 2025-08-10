@@ -15,6 +15,7 @@ from app.schemas.task import (
     TaskResponseSchema,
     TaskUpdateSchema,
     TaskAssignGroupsSchema,
+    TaskAssignUserSchema,
 )
 
 router = APIRouter(
@@ -156,11 +157,10 @@ async def delete_task(
 async def assign_task_to_user(
         task_id: int,
         user_id: int,
+        assignment: TaskAssignUserSchema,
         db: AsyncSession = Depends(get_database_session)
 ) -> TaskResponseSchema:
-    """
-    Assign a task to a specific user.
-    """
+    """Assign a task to a specific user."""
     query = select(Task).where(Task.id == task_id)
     result = await db.execute(query)
     task = result.scalar_one_or_none()
@@ -172,6 +172,7 @@ async def assign_task_to_user(
         )
 
     task.assigned_user_id = user_id
+    task.assigned_by_user_id = assignment.assigned_by_user_id
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)
@@ -207,6 +208,7 @@ async def unassign_task_from_user(
         )
 
     task.assigned_user_id = None
+    task.assigned_by_user_id = None
     await db.commit()
     await db.refresh(task)
     return TaskResponseSchema.model_validate(task)

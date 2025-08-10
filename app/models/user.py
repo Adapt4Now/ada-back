@@ -61,6 +61,13 @@ class User(Base):
         back_populates="assigned_user",
         cascade="all, delete-orphan",
     )
+    # Tasks this user assigned to others
+    assigned_tasks = relationship(
+        "Task",
+        back_populates="assigned_by",
+        foreign_keys="Task.assigned_by_user_id",
+        lazy="selectin",
+    )
 
     family = relationship(
         "Family",
