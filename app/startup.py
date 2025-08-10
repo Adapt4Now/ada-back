@@ -15,7 +15,7 @@ from app.routers import (
     admin,
 )
 from app.database import get_database_session
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreateSchema, UserUpdateSchema
 from pydantic import EmailStr
 from app.crud.user import create_user as crud_create_user, update_user as crud_update_user
@@ -42,11 +42,11 @@ async def ensure_admin_user() -> None:
                     username="admin",
                     email="admin@example.com",
                     password="password",
-                    is_superuser=True,
+                    role=UserRole.ADMIN,
                 ),
             )
-        elif not admin_user.is_superuser:
-            await crud_update_user(db, admin_user.id, UserUpdateSchema(is_superuser=True))
+        elif admin_user.role != UserRole.ADMIN:
+            await crud_update_user(db, admin_user.id, UserUpdateSchema(role=UserRole.ADMIN))
         break
 
 class ApplicationSetup:

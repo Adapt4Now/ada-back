@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
@@ -10,11 +11,12 @@ from sqlalchemy import select, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_database_session
-from app.models.user import User
+from app.models.user import User, UserStatus
 
 SECRET_KEY = os.getenv("SECRET_KEY", "secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
+RESET_TOKEN_EXPIRE_MINUTES = 60
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -34,6 +36,22 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     )
     to_encode.update({"exp": expire})
     return encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def generate_reset_token() -> tuple[str, datetime]:
+    token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(
+        minutes=RESET_TOKEN_EXPIRE_MINUTES
+    )
+    return token, expires_at
+
+
+def verify_reset_token(user: User, token: str) -> bool:
+    return (
+        user.reset_token == token
+        and user.reset_token_expires_at is not None
+        and user.reset_token_expires_at > datetime.now(timezone.utc)
+    )
 
 
 oauth2_scheme = HTTPBearer()
@@ -71,14 +89,16 @@ async def get_current_user(
 
 async def get_current_active_user(user: User = Depends(get_current_user)) -> User:
     """Ensure the user is active."""
-    if not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user")
+    if not user.is_active or user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive user"
+        )
     return user
 
 
-async def get_current_superuser(user: User = Depends(get_current_active_user)) -> User:
+async def get_current_admin(user: User = Depends(get_current_active_user)) -> User:
     """Ensure the user has administrative privileges."""
-    if not user.is_superuser:
+    if user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return user
 

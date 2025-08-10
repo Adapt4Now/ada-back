@@ -1,7 +1,8 @@
 from datetime import datetime
+from enum import Enum as PyEnum
 from typing import Optional, List, TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -12,6 +13,15 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+class TaskStatus(str, PyEnum):
+    """Enumeration of possible task statuses."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
 class Task(Base):
     """Task model representing a task in the system."""
 
@@ -20,8 +30,12 @@ class Task(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    is_completed: Mapped[bool] = mapped_column(Boolean, default=False)
+    status: Mapped[TaskStatus] = mapped_column(
+        SqlEnum(TaskStatus, name="taskstatus"),
+        default=TaskStatus.PENDING,
+    )
     priority: Mapped[int] = mapped_column(Integer, default=1)
+    reward_points: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -35,6 +49,11 @@ class Task(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
 
     assigned_user_id: Mapped[Optional[int]] = mapped_column(
         Integer,
@@ -65,5 +84,5 @@ class Task(Base):
     )
 
     def __repr__(self) -> str:  # pragma: no cover - simple repr
-        return f"Task(id={self.id}, title='{self.title}', completed={self.is_completed})"
+        return f"Task(id={self.id}, title='{self.title}', status={self.status})"
 

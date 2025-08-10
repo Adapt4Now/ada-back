@@ -1,8 +1,11 @@
 
+from enum import Enum
+
 from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Enum as SQLEnum,
     ForeignKey,
     Integer,
     SmallInteger,
@@ -12,6 +15,7 @@ from sqlalchemy import (
 from sqlalchemy import true
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+import enum
 
 from app.database import Base
 from typing import TYPE_CHECKING
@@ -23,6 +27,13 @@ if TYPE_CHECKING:
     from app.models.family import Family
 
 
+class UserStatus(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    PENDING = "PENDING"
+    SUSPENDED = "SUSPENDED"
+    BANNED = "BANNED"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -30,7 +41,14 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    reset_token = Column(String, nullable=True, index=True)
+    reset_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     is_active = Column(Boolean, default=true(), server_default=true())
+    status = Column(
+        SQLEnum(UserStatus, name="userstatus"),
+        nullable=False,
+        server_default="ACTIVE",
+    )
 
     is_superuser = Column(Boolean, nullable=False, server_default=text('false'))
     is_premium = Column(Boolean, nullable=False, server_default=true())
@@ -105,6 +123,13 @@ class User(Base):
         back_populates="users",
         lazy="selectin",
         viewonly=True,
+    )
+
+    achievements = relationship(
+        "Achievement",
+        secondary="user_achievements",
+        back_populates="users",
+        lazy="selectin",
     )
 
     creator = relationship("User", remote_side=[id])
