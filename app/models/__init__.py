@@ -2,6 +2,7 @@ from .user import User, UserRole
 from .group import Group
 from .family import Family
 from .task import Task
+from .achievement import Achievement
 from .associations import task_group_association
 from .membership import GroupMembership, FamilyMembership
 from .setting import Setting
