@@ -1,8 +1,6 @@
 from datetime import datetime, UTC
 import logging
 
-from app.domain.users.repository import UserRepository
-from app.domain.families.repository import FamilyRepository
 from app.database import UnitOfWork
 from app.domain.users.schemas import (
     UserCreateSchema,
@@ -26,13 +24,20 @@ logger = logging.getLogger(__name__)
 class AuthService:
     """Service layer for authentication and authorization operations."""
 
-    def __init__(self, uow: UnitOfWork):
+    def __init__(
+        self,
+        user_repo_factory,
+        family_repo_factory,
+        uow: UnitOfWork,
+    ):
+        self.user_repo_factory = user_repo_factory
+        self.family_repo_factory = family_repo_factory
         self.uow = uow
 
     async def register_user(self, user_data: UserCreateSchema) -> UserResponseSchema:
         async with self.uow as uow:
-            user_repo = UserRepository(uow.session)
-            family_repo = FamilyRepository(uow.session)
+            user_repo = self.user_repo_factory(uow.session)
+            family_repo = self.family_repo_factory(uow.session)
             new_user = await user_repo.create(user_data)
             family = await family_repo.create(
                 FamilyCreate(name=f"{new_user.username}'s family", created_by=new_user.id)
@@ -48,7 +53,7 @@ class AuthService:
             raise AppError("Username or email required")
 
         async with self.uow as uow:
-            user_repo = UserRepository(uow.session)
+            user_repo = self.user_repo_factory(uow.session)
             user = await user_repo.get_by_username_or_email(
                 credentials.username, credentials.email
             )
@@ -63,7 +68,7 @@ class AuthService:
 
     async def request_password_reset(self, data: PasswordResetRequest) -> dict:
         async with self.uow as uow:
-            user_repo = UserRepository(uow.session)
+            user_repo = self.user_repo_factory(uow.session)
             token = await user_repo.create_reset_token(data.email)
             if token is None:
                 raise UserNotFoundError()
@@ -72,7 +77,7 @@ class AuthService:
 
     async def apply_password_reset(self, data: PasswordResetConfirm) -> dict:
         async with self.uow as uow:
-            user_repo = UserRepository(uow.session)
+            user_repo = self.user_repo_factory(uow.session)
             success = await user_repo.reset_password(data.token, data.new_password)
             if not success:
                 raise AppError("Invalid or expired token")

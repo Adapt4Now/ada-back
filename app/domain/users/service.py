@@ -1,7 +1,6 @@
 from typing import List
 import logging
 
-from .repository import UserRepository
 from app.database import UnitOfWork
 from .schemas import (
     UserCreateSchema,
@@ -16,31 +15,32 @@ logger = logging.getLogger(__name__)
 class UserService:
     """Service layer for user-related operations."""
 
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, repo_factory, uow: UnitOfWork):
+        self.repo_factory = repo_factory
         self.uow = uow
 
     async def create_user(self, user_data: UserCreateSchema) -> UserResponseSchema:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             new_user = await repo.create(user_data)
         logger.info("Created user %s", new_user.id)
         return UserResponseSchema.model_validate(new_user)
 
     async def get_users(self) -> List[UserResponseSchema]:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             users = await repo.get_all()
         return [UserResponseSchema.model_validate(user) for user in users]
 
     async def get_user(self, user_id: int) -> UserResponseSchema:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             user = await repo.get_by_id(user_id)
         return UserResponseSchema.model_validate(user)
 
     async def delete_user(self, user_id: int) -> None:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             await repo.delete(user_id)
         logger.info("Deleted user %s", user_id)
 
@@ -48,7 +48,7 @@ class UserService:
         self, user_id: int, user_data: UserUpdateSchema
     ) -> UserResponseSchema:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             user = await repo.update(user_id, user_data)
         return UserResponseSchema.model_validate(user)
 
@@ -56,6 +56,6 @@ class UserService:
         self, user_id: int, status: UserStatus
     ) -> UserResponseSchema:
         async with self.uow as uow:
-            repo = UserRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             user = await repo.update_status(user_id, status)
         return UserResponseSchema.model_validate(user)

@@ -1,7 +1,6 @@
 from typing import List
 
 from app.core.exceptions import GroupNotFoundError
-from .repository import GroupRepository
 from .schemas import GroupCreate, GroupUpdate, GroupResponse
 from app.database import UnitOfWork
 
@@ -9,31 +8,32 @@ from app.database import UnitOfWork
 class GroupService:
     """Service layer for group-related operations."""
 
-    def __init__(self, uow: UnitOfWork):
+    def __init__(self, repo_factory, uow: UnitOfWork):
+        self.repo_factory = repo_factory
         self.uow = uow
 
     async def get_groups(self) -> List[GroupResponse]:
         async with self.uow as uow:
-            repo = GroupRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             groups = await repo.get_list()
         return [GroupResponse.model_validate(group) for group in groups]
 
     async def create_group(self, group_data: GroupCreate) -> GroupResponse:
         async with self.uow as uow:
-            repo = GroupRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             new_group = await repo.create(group_data)
         return GroupResponse.model_validate(new_group)
 
     async def delete_group(self, group_id: int) -> None:
         async with self.uow as uow:
-            repo = GroupRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             group = await repo.delete(group_id)
         if group is None:
             raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
 
     async def update_group(self, group_id: int, group_data: GroupUpdate) -> GroupResponse:
         async with self.uow as uow:
-            repo = GroupRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             group = await repo.update(group_id, group_data)
         if group is None:
             raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
@@ -41,7 +41,7 @@ class GroupService:
 
     async def add_user_to_group(self, group_id: int, user_id: int) -> GroupResponse:
         async with self.uow as uow:
-            repo = GroupRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             group = await repo.get(group_id, active_only=False)
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
@@ -51,7 +51,7 @@ class GroupService:
 
     async def remove_user_from_group(self, group_id: int, user_id: int) -> GroupResponse:
         async with self.uow as uow:
-            repo = GroupRepository(uow.session)
+            repo = self.repo_factory(uow.session)
             group = await repo.get(group_id, active_only=False)
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
