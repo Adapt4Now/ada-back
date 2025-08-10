@@ -28,7 +28,6 @@ class NotificationService:
             notification = await repo.create(
                 NotificationCreate(user_id=user_id, message=data.message)
             )
-            await uow.commit()
         return NotificationResponse.model_validate(notification)
 
     async def mark_as_read(self, notification_id: int) -> NotificationResponse:
@@ -37,13 +36,11 @@ class NotificationService:
             notification = await repo.mark_as_read(notification_id)
             if notification is None:
                 raise NotificationNotFoundError()
-            await uow.commit()
         return NotificationResponse.model_validate(notification)
 
     async def delete_notification(self, notification_id: int) -> None:
         async with self.uow as uow:
             repo = NotificationRepository(uow.session)
             success = await repo.delete(notification_id)
-            await uow.commit()
         if not success:
             raise NotificationNotFoundError()

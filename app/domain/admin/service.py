@@ -31,5 +31,4 @@ class AdminService:
         async with self.uow as uow:
             repo = UserRepository(uow.session)
             user = await repo.update(user_id, UserUpdateSchema(role=UserRole.ADMIN))
-            await uow.commit()
         return UserAdminResponseSchema.model_validate(user)

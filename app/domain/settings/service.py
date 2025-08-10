@@ -21,5 +21,4 @@ class SettingService:
         async with self.uow as uow:
             repo = SettingRepository(uow.session)
             setting = await repo.update(user_id, data)
-            await uow.commit()
         return SettingResponse.model_validate(setting)

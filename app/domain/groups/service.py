@@ -22,14 +22,12 @@ class GroupService:
         async with self.uow as uow:
             repo = GroupRepository(uow.session)
             new_group = await repo.create(group_data)
-            await uow.commit()
         return GroupResponse.model_validate(new_group)
 
     async def delete_group(self, group_id: int) -> None:
         async with self.uow as uow:
             repo = GroupRepository(uow.session)
             group = await repo.delete(group_id)
-            await uow.commit()
         if group is None:
             raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
 
@@ -37,7 +35,6 @@ class GroupService:
         async with self.uow as uow:
             repo = GroupRepository(uow.session)
             group = await repo.update(group_id, group_data)
-            await uow.commit()
         if group is None:
             raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
         return GroupResponse.model_validate(group)
@@ -49,7 +46,6 @@ class GroupService:
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
             updated_group = await repo.add_users(group_id, {user_id: "member"})
-            await uow.commit()
         assert updated_group is not None
         return GroupResponse.model_validate(updated_group)
 
@@ -60,6 +56,5 @@ class GroupService:
             if group is None:
                 raise GroupNotFoundError(detail=f"Group with id {group_id} not found")
             updated_group = await repo.remove_users(group_id, [user_id])
-            await uow.commit()
         assert updated_group is not None
         return GroupResponse.model_validate(updated_group)
